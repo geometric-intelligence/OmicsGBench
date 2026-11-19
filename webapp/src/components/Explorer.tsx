@@ -2,82 +2,136 @@ import { useState, useEffect, useMemo, lazy } from 'react';
 
 // Dynamically import Plotly to avoid SSR issues
 const Plot = lazy(() => import('react-plotly.js'));
-import type { GraphStats, DatasetName, NodeSelectionMethod } from '../lib/types';
-import { DATASETS, VALID_RATIOS, VALID_THRESHOLDS, VALID_ADJACENCY_METHODS, ADJACENCY_METHOD_LABELS, METRIC_LABELS } from '../lib/constants';
+import type { DatasetName, GraphStats, GraphStatsMetric, NodeSelectionMethod } from '../lib/types';
+import {
+  DATASETS,
+  DATASET_ORDER,
+  VALID_METHODS,
+  METHOD_LABELS,
+  ADJACENCY_METHOD_LABELS,
+  METRIC_LABELS,
+  compareRatios,
+  formatRatio,
+} from '../lib/constants';
+import { getStatsKey, computeMetricRange } from '../lib/data';
 
-/** Metrics shown in the Explorer (2 rows × 3). Order: row1 = nodes, edges, avg_degree; row2 = density_pct, degree_std, largest_cc. */
-const EXPLORER_METRICS: (keyof typeof METRIC_LABELS)[] = [
+/** 3 × 3 grid: size, then connectivity, then structure. */
+const EXPLORER_METRICS: GraphStatsMetric[] = [
   'num_nodes',
   'num_edges',
   'avg_degree',
   'density_pct',
-  'degree_std',
   'largest_cc_ratio_pct',
+  'diameter',
+  'clustering_coefficient',
+  'modularity',
+  'homophily',
 ];
-import { getStats, computeMetricMaxValues } from '../lib/data';
 
-/** Parse stats keys "dataset|ratio|method|threshold[|adjacency_method]" to derive unique options. */
-function deriveOptionsFromStats(stats: Record<string, GraphStats>): {
-  ratios: number[];
-  thresholds: number[];
-  adjacencyMethods: string[];
-} {
-  const ratioSet = new Set<number>();
-  const thresholdSet = new Set<number>();
-  const adjMethodSet = new Set<string>();
-  for (const key of Object.keys(stats)) {
-    const parts = key.split('|');
-    if (parts.length < 4) continue;
-    const r = parseFloat(parts[1]);
-    const t = parseFloat(parts[3]);
-    if (!Number.isNaN(r)) ratioSet.add(r);
-    if (!Number.isNaN(t)) thresholdSet.add(t);
-    if (parts.length >= 5 && parts[4]) adjMethodSet.add(parts[4]);
+const METHOD_EMOJIS: Record<string, string> = {
+  variance: '📊',
+  correlation: '🔗',
+  distance_correlation: '📐',
+  random: '🎲',
+};
+
+const GRID_COLS = 3;
+const FACET_HEIGHT = 190;
+const FACET_ROW_GAP = 70;
+const FACET_COL_GAP = 0.08;
+const CHART_MARGIN = { l: 60, r: 30, t: 40, b: 20 };
+
+const DEFAULT_RATIO = '0.5';
+// The benchmark builds STRING graphs at a 0.4 confidence threshold.
+const DEFAULT_THRESHOLD = 0.4;
+const DEFAULT_ADJACENCY_METHOD = 'string';
+
+const COUNT_METRICS = new Set<GraphStatsMetric>(['num_nodes', 'num_edges', 'avg_degree', 'degree_std']);
+
+function formatCompact(v: number): string {
+  if (Math.abs(v) >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
+  if (Math.abs(v) >= 1e4) return `${(v / 1e3).toFixed(1)}k`;
+  return Math.round(v).toLocaleString();
+}
+
+function formatMetric(metric: GraphStatsMetric, v: number | null): string {
+  if (v === null) return 'n/a';
+  switch (metric) {
+    case 'num_nodes':
+    case 'num_edges':
+    case 'num_connected_components':
+    case 'diameter':
+      return formatCompact(v);
+    case 'density_pct':
+    case 'largest_cc_ratio_pct':
+      return `${v.toFixed(1)}%`;
+    case 'avg_degree':
+    case 'degree_std':
+      return v >= 1e4 ? formatCompact(v) : v.toFixed(1);
+    default:
+      return v.toFixed(2);
   }
-  const ratios = [...ratioSet].sort((a, b) => a - b);
-  const thresholds = [...thresholdSet].sort((a, b) => a - b);
-  const adjacencyMethods = [...adjMethodSet].sort();
-  return { ratios, thresholds, adjacencyMethods };
+}
+
+interface StatsOptions {
+  datasets: DatasetName[];
+  ratios: string[];
+  methods: string[];
+  thresholds: string[];
+  adjacencyMethods: string[];
+}
+
+/** Keys are "dataset|ratio|method|threshold|adjacency_method"; ratio and threshold stay strings to match them exactly. */
+function deriveOptionsFromStats(stats: Record<string, GraphStats>): StatsOptions {
+  const datasets = new Set<string>();
+  const ratios = new Set<string>();
+  const methods = new Set<string>();
+  const thresholds = new Set<string>();
+  const adjacencyMethods = new Set<string>();
+  for (const key of Object.keys(stats)) {
+    const [dataset, ratio, method, threshold, adjacencyMethod] = key.split('|');
+    if (adjacencyMethod === undefined) continue;
+    datasets.add(dataset);
+    ratios.add(ratio);
+    methods.add(method);
+    thresholds.add(threshold);
+    adjacencyMethods.add(adjacencyMethod);
+  }
+  return {
+    datasets: DATASET_ORDER.filter((ds) => datasets.has(ds)),
+    ratios: [...ratios].sort(compareRatios),
+    methods: VALID_METHODS.filter((m) => methods.has(m)),
+    thresholds: [...thresholds].sort((a, b) => parseFloat(a) - parseFloat(b)),
+    adjacencyMethods: [...adjacencyMethods].sort(),
+  };
+}
+
+function closestThreshold(thresholds: string[], target: number): string {
+  return thresholds.reduce(
+    (best, t) => (Math.abs(parseFloat(t) - target) < Math.abs(parseFloat(best) - target) ? t : best),
+    thresholds[0]
+  );
 }
 
 export default function Explorer() {
   const [allStats, setAllStats] = useState<Record<string, GraphStats>>({});
   const [loading, setLoading] = useState(true);
-  const [nodeSampleRatio, setNodeSampleRatio] = useState<number>(0.5);
+  const [nodeSampleRatio, setNodeSampleRatio] = useState(DEFAULT_RATIO);
   const [nodeSelectionMethod, setNodeSelectionMethod] = useState<NodeSelectionMethod>('variance');
-  const [adjacencyThreshold, setAdjacencyThreshold] = useState(0.02);
-  const [adjacencyMethod, setAdjacencyMethod] = useState<string | undefined>(undefined);
+  const [adjacencyThreshold, setAdjacencyThreshold] = useState('');
+  const [adjacencyMethod, setAdjacencyMethod] = useState(DEFAULT_ADJACENCY_METHOD);
 
-  // All datasets are always shown
-  const datasetOrder: DatasetName[] = ['motrpac', 'addneuromed', 'parkinsons', 'brca'];
+  const options = useMemo(() => deriveOptionsFromStats(allStats), [allStats]);
 
-  const { ratios: validRatios, thresholds: validThresholds, adjacencyMethods: validAdjacencyMethods } = useMemo(() => {
-    const derived = deriveOptionsFromStats(allStats);
-    return {
-      ratios: derived.ratios.length > 0 ? derived.ratios : [...VALID_RATIOS],
-      thresholds: derived.thresholds.length > 0 ? derived.thresholds : [...VALID_THRESHOLDS],
-      adjacencyMethods: derived.adjacencyMethods.length > 0 ? derived.adjacencyMethods : [...VALID_ADJACENCY_METHODS],
-    };
-  }, [allStats]);
-
-  // When data loads, ensure selected values exist in the data; otherwise pick first available
-  useEffect(() => {
-    if (loading || Object.keys(allStats).length === 0) return;
-    const { ratios, thresholds, adjacencyMethods } = deriveOptionsFromStats(allStats);
-    if (ratios.length === 0 || thresholds.length === 0) return;
-    setNodeSampleRatio((prev) => (ratios.includes(prev) ? prev : ratios[0]));
-    setAdjacencyThreshold((prev) => (thresholds.includes(prev) ? prev : thresholds[0]));
-    if (adjacencyMethods.length > 0) {
-      setAdjacencyMethod((prev) => (prev && adjacencyMethods.includes(prev) ? prev : adjacencyMethods[0]));
-    }
-  }, [loading, allStats]);
-
-  // Load data on mount
   useEffect(() => {
     fetch('/data/stats.json')
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: Record<string, GraphStats>) => {
+        const derived = deriveOptionsFromStats(data);
         setAllStats(data);
+        setNodeSampleRatio((prev) => (derived.ratios.includes(prev) ? prev : derived.ratios[0]));
+        setAdjacencyThreshold(closestThreshold(derived.thresholds, DEFAULT_THRESHOLD));
+        setAdjacencyMethod((prev) => (derived.adjacencyMethods.includes(prev) ? prev : derived.adjacencyMethods[0]));
         setLoading(false);
       })
       .catch((err) => {
@@ -86,22 +140,14 @@ export default function Explorer() {
       });
   }, []);
 
-  // Compute max values for y-axis ranges
-  const metricMaxValues = useMemo(() => computeMetricMaxValues(allStats), [allStats]);
-
-  // Get current stats for selected parameters
-  const currentStats = useMemo(() => {
-    const stats: (GraphStats & { dataset: DatasetName })[] = [];
-    for (const ds of datasetOrder) {
-      const s = getStats(allStats, ds, nodeSampleRatio, nodeSelectionMethod, adjacencyThreshold, adjacencyMethod);
-      if (s) {
-        stats.push({ ...s, dataset: ds });
-      }
-    }
-    return stats;
-  }, [allStats, nodeSampleRatio, nodeSelectionMethod, adjacencyThreshold, adjacencyMethod]);
-
-  const metrics = EXPLORER_METRICS.map((key) => [key, METRIC_LABELS[key]] as [keyof GraphStats, string]);
+  // Axes are shared by every method and threshold at the current ratio and graph construction, so they
+  // stay fixed while those controls move but still fit the much larger "all features" graphs.
+  const metricRanges = useMemo(() => {
+    const scope = Object.values(allStats).filter(
+      (s) => s.node_sample_ratio === nodeSampleRatio && s.adjacency_method === adjacencyMethod
+    );
+    return Object.fromEntries(EXPLORER_METRICS.map((m) => [m, computeMetricRange(scope, m)]));
+  }, [allStats, nodeSampleRatio, adjacencyMethod]);
 
   if (loading) {
     return (
@@ -111,113 +157,85 @@ export default function Explorer() {
     );
   }
 
-  // Build subplot data
+  const datasetLabels = options.datasets.map((ds) => DATASETS[ds].fullName);
+  const datasetColors = options.datasets.map((ds) => DATASETS[ds].color);
+  const currentStats = options.datasets.map(
+    (ds) => allStats[getStatsKey(ds, nodeSampleRatio, nodeSelectionMethod, adjacencyThreshold, adjacencyMethod)]
+  );
+
+  const numRows = Math.ceil(EXPLORER_METRICS.length / GRID_COLS);
+  const innerHeight = numRows * FACET_HEIGHT + (numRows - 1) * FACET_ROW_GAP;
+  const chartHeight = innerHeight + CHART_MARGIN.t + CHART_MARGIN.b;
+  const colWidth = (1 - (GRID_COLS - 1) * FACET_COL_GAP) / GRID_COLS;
+
   const subplotData: Plotly.Data[] = [];
   const annotations: Partial<Plotly.Annotations>[] = [];
+  const layout: Partial<Plotly.Layout> = {
+    height: chartHeight,
+    font: { family: 'DM Sans', size: 14, color: '#0f172a' },
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: '#ffffff',
+    margin: CHART_MARGIN,
+    annotations,
+    showlegend: false,
+  };
 
-  for (let idx = 0; idx < metrics.length; idx++) {
-    const [metric, label] = metrics[idx];
-    const row = Math.floor(idx / 3);
-    const col = idx % 3;
-    const xAxisId = idx === 0 ? 'x' : `x${idx + 1}`;
-    const yAxisId = idx === 0 ? 'y' : `y${idx + 1}`;
-
-    const xLabels = datasetOrder.map((ds) => `${DATASETS[ds].emoji} ${DATASETS[ds].fullName}`);
-    const yValues: (number | null)[] = [];
-    const colors: string[] = [];
-    const textValues: string[] = [];
-
-    for (const ds of datasetOrder) {
-      const stat = currentStats.find((s) => s.dataset === ds);
-      if (stat) {
-        const v = stat[metric] as number;
-        yValues.push(v);
-        colors.push(DATASETS[ds].color);
-
-        if (metric === 'density_pct' || metric === 'largest_cc_ratio_pct') {
-          textValues.push(`${v.toFixed(1)}%`);
-        } else if (metric === 'num_nodes' || metric === 'num_edges') {
-          textValues.push(Math.round(v).toLocaleString());
-        } else {
-          textValues.push(v.toFixed(1));
-        }
-      } else {
-        yValues.push(null);
-        colors.push('rgba(200,200,200,0.3)');
-        textValues.push('');
-      }
-    }
+  EXPLORER_METRICS.forEach((metric, idx) => {
+    const row = Math.floor(idx / GRID_COLS);
+    const col = idx % GRID_COLS;
+    const axisNum = idx === 0 ? '' : `${idx + 1}`;
+    const top = 1 - (row * (FACET_HEIGHT + FACET_ROW_GAP)) / innerHeight;
+    const xDomain = [col * (colWidth + FACET_COL_GAP), col * (colWidth + FACET_COL_GAP) + colWidth];
+    const values = currentStats.map((s) => (s ? s[metric] : null));
 
     subplotData.push({
       type: 'bar',
-      x: xLabels,
-      y: yValues,
-      marker: { color: colors },
-      text: textValues,
+      x: datasetLabels,
+      y: values.map((v) => v ?? 0),
+      marker: { color: currentStats.map((s, i) => (s ? datasetColors[i] : 'rgba(200,200,200,0.3)')) },
+      text: currentStats.map((s, i) => (s ? formatMetric(metric, values[i]) : '')),
       textposition: 'outside',
-      textfont: { size: 14, family: 'JetBrains Mono', color: '#0f172a' },
-      showlegend: false,
+      textfont: { size: 11, family: 'JetBrains Mono', color: '#0f172a' },
+      hovertemplate: `<b>%{x}</b><br>${METRIC_LABELS[metric]}: %{text}<extra></extra>`,
       cliponaxis: false,
-      xaxis: xAxisId,
-      yaxis: yAxisId,
+      xaxis: `x${axisNum}`,
+      yaxis: `y${axisNum}`,
     } as Plotly.Data);
 
-    // Add subplot title as annotation - centered above each subplot (2 rows × 3 columns)
-    const colCenters = [0.14, 0.5, 0.86];
-    const rowTops = [1.0, 0.48]; // Top positions for 2 rows
-
     annotations.push({
-      text: `<b>${label}</b>`,
+      text: `<b>${METRIC_LABELS[metric]}</b>`,
       xref: 'paper',
       yref: 'paper',
-      x: colCenters[col],
-      y: rowTops[row],
+      x: (xDomain[0] + xDomain[1]) / 2,
+      y: top,
+      yshift: 14,
       showarrow: false,
       font: { size: 12, color: '#1e293b', family: 'DM Sans' },
       xanchor: 'center',
       yanchor: 'bottom',
     });
-  }
 
-  // Build layout with 2×3 subplots
-  const layout: Partial<Plotly.Layout> = {
-    height: 680,
-    font: { family: 'DM Sans', size: 14, color: '#0f172a' },
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: '#ffffff',
-    margin: { l: 60, r: 40, t: 50, b: 50 },
-    annotations,
-    grid: {
-      rows: 2,
-      columns: 3,
-      pattern: 'independent',
-      xgap: 0.1,
-      ygap: 0.18,
-    },
-  };
-
-  // Configure axes for each subplot
-  for (let idx = 0; idx < metrics.length; idx++) {
-    const [metric] = metrics[idx];
-    const axisNum = idx === 0 ? '' : `${idx + 1}`;
-
-    (layout as Record<string, unknown>)[`xaxis${axisNum}`] = {
+    const layoutAxes = layout as Record<string, unknown>;
+    layoutAxes[`xaxis${axisNum}`] = {
+      domain: xDomain,
+      anchor: `y${axisNum}`,
       showgrid: false,
-      tickangle: 0,
-      tickfont: { size: 11, color: '#475569' },
+      showticklabels: false,
       fixedrange: true,
     };
-
-    (layout as Record<string, unknown>)[`yaxis${axisNum}`] = {
+    layoutAxes[`yaxis${axisNum}`] = {
+      domain: [top - FACET_HEIGHT / innerHeight, top],
+      anchor: `x${axisNum}`,
       showgrid: true,
       gridcolor: 'rgba(226,232,240,0.8)',
       zeroline: true,
       zerolinecolor: 'rgba(226,232,240,1)',
-      tickfont: { size: 12, color: '#475569' },
+      tickfont: { size: 11, color: '#475569' },
+      tickformat: COUNT_METRICS.has(metric) ? '~s' : undefined,
       fixedrange: true,
-      range: [0, metricMaxValues[metric as string] || 1],
+      range: metricRanges[metric],
     };
-  }
+  });
 
   return (
     <div>
@@ -226,18 +244,18 @@ export default function Explorer() {
         <div className="controls-grid">
           <div className="control-group">
             <div className="control-label">Node Sample Ratio</div>
-            <div className="control-value">p = {nodeSampleRatio}</div>
+            <div className="control-value">{formatRatio(nodeSampleRatio)}</div>
             <input
               type="range"
               min={0}
-              max={validRatios.length - 1}
+              max={options.ratios.length - 1}
               step={1}
-              value={Math.max(0, validRatios.indexOf(nodeSampleRatio))}
-              onChange={(e) => setNodeSampleRatio(validRatios[parseInt(e.target.value)] ?? validRatios[0])}
+              value={Math.max(0, options.ratios.indexOf(nodeSampleRatio))}
+              onChange={(e) => setNodeSampleRatio(options.ratios[parseInt(e.target.value)] ?? options.ratios[0])}
             />
             <div className="flex justify-between text-xs text-text-muted mt-1">
-              {validRatios.map((r) => (
-                <span key={r}>{r}</span>
+              {options.ratios.map((r) => (
+                <span key={r}>{r === 'full' ? 'all' : r}</span>
               ))}
             </div>
           </div>
@@ -248,20 +266,18 @@ export default function Explorer() {
               value={nodeSelectionMethod}
               onChange={(e) => setNodeSelectionMethod(e.target.value as NodeSelectionMethod)}
             >
-              <option value="variance">📊 Variance</option>
-              <option value="correlation">🔗 Correlation</option>
-              <option value="distance_correlation">📐 Distance Correlation</option>
-              <option value="random">🎲 Random</option>
+              {options.methods.map((m) => (
+                <option key={m} value={m}>
+                  {METHOD_EMOJIS[m] ?? '🔹'} {METHOD_LABELS[m] ?? m}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="control-group">
             <div className="control-label">Graph Construction</div>
-            <select
-              value={adjacencyMethod ?? validAdjacencyMethods[0] ?? 'string'}
-              onChange={(e) => setAdjacencyMethod(e.target.value)}
-            >
-              {validAdjacencyMethods.map((m) => (
+            <select value={adjacencyMethod} onChange={(e) => setAdjacencyMethod(e.target.value)}>
+              {options.adjacencyMethods.map((m) => (
                 <option key={m} value={m}>
                   {ADJACENCY_METHOD_LABELS[m] ?? m}
                 </option>
@@ -271,32 +287,44 @@ export default function Explorer() {
 
           <div className="control-group">
             <div className="control-label">Adjacency Threshold</div>
-            <div className="control-value">τ = {adjacencyThreshold.toFixed(2)}</div>
+            <div className="control-value">τ = {parseFloat(adjacencyThreshold).toFixed(2)}</div>
             <input
               type="range"
               min={0}
-              max={validThresholds.length - 1}
+              max={options.thresholds.length - 1}
               step={1}
-              value={Math.max(0, validThresholds.indexOf(adjacencyThreshold))}
-              onChange={(e) => setAdjacencyThreshold(validThresholds[parseInt(e.target.value)] ?? validThresholds[0])}
+              value={Math.max(0, options.thresholds.indexOf(adjacencyThreshold))}
+              onChange={(e) =>
+                setAdjacencyThreshold(options.thresholds[parseInt(e.target.value)] ?? options.thresholds[0])
+              }
             />
             <div className="flex justify-between text-xs text-text-muted mt-1">
-              {validThresholds.map((t) => (
-                <span key={t}>{t}</span>
+              {options.thresholds.map((t) => (
+                <span key={t}>{parseFloat(t)}</span>
               ))}
             </div>
           </div>
-
         </div>
       </div>
 
       {/* Charts */}
       <div className="charts-container">
+        <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 pt-2 text-sm text-text-secondary">
+          {options.datasets.map((ds, i) => (
+            <span key={ds} className="inline-flex items-center gap-1.5">
+              <span
+                className="inline-block h-3 w-3 rounded-sm"
+                style={{ backgroundColor: datasetColors[i] }}
+              />
+              {DATASETS[ds].emoji} {datasetLabels[i]}
+            </span>
+          ))}
+        </div>
         <Plot
           data={subplotData}
           layout={layout}
-          config={{ displayModeBar: true, responsive: true }}
-          style={{ width: '100%', height: '680px' }}
+          config={{ displayModeBar: 'hover', responsive: true }}
+          style={{ width: '100%', height: `${chartHeight}px` }}
         />
       </div>
     </div>

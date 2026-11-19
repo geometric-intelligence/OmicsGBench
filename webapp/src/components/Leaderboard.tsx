@@ -1,19 +1,47 @@
 import { useState, useEffect, useMemo, lazy } from 'react';
 
 const Plot = lazy(() => import('react-plotly.js'));
-import type { ResultEntry, DatasetName, RankingMetric, DisplayMetric } from '../lib/types';
-import { DATASETS, MODEL_ORDER, BASELINE_MODELS, MODEL_COLORS, RANKING_METRICS, DISPLAY_METRICS, VALID_METHODS, VALID_RATIOS, METHOD_LABELS, RATIO_LABELS, ADJACENCY_METHOD_LABELS } from '../lib/constants';
-import { computeLeaderboard, filterResults, getModelsByDataset, getDisplayMetricValue } from '../lib/data';
+import type { ResultEntry, DatasetName, RankingMetric, DisplayMetric, Readout } from '../lib/types';
+import {
+  DATASETS,
+  DATASET_ORDER,
+  MODEL_ORDER,
+  BASELINE_MODELS,
+  MODEL_COLORS,
+  MODEL_LABELS,
+  RANKING_METRICS,
+  DISPLAY_METRICS,
+  VALID_METHODS,
+  METHOD_LABELS,
+  READOUT_LABELS,
+  ADJACENCY_METHOD_LABELS,
+  ratioKey,
+  compareRatios,
+  formatRatio,
+} from '../lib/constants';
+import { computeLeaderboard, filterResults, getModelsByDataset } from '../lib/data';
 
-const ALL_DATASETS: DatasetName[] = ['motrpac', 'addneuromed', 'parkinsons', 'brca'];
+const CHART_MODELS = [...MODEL_ORDER, ...BASELINE_MODELS];
+const CHART_LABELS = CHART_MODELS.map((m) => MODEL_LABELS[m] ?? m);
+
+const FACET_HEIGHT = 260;
+const FACET_ROW_GAP = 120;
+const FACET_COL_GAP = 0.05;
+const CHART_MARGIN = { l: 60, r: 20, t: 50, b: 90 };
+
+function labelColor(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? '#0f172a' : '#ffffff';
+}
 
 export default function Leaderboard() {
   const [results, setResults] = useState<ResultEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [datasetFilter, setDatasetFilter] = useState<DatasetName | 'all'>('all');
   const [methodFilter, setMethodFilter] = useState<string | 'all'>('all');
-  const [ratioFilter, setRatioFilter] = useState<number | 'all'>('all');
+  const [ratioFilter, setRatioFilter] = useState<string | 'all'>('all');
   const [adjacencyMethodFilter, setAdjacencyMethodFilter] = useState<string | 'all'>('all');
+  const [readoutFilter, setReadoutFilter] = useState<Readout | 'all'>('all');
   const [rankBy, setRankBy] = useState<RankingMetric>('val_f1_macro');
   const [displayMetric, setDisplayMetric] = useState<DisplayMetric>('test_f1_macro');
 
@@ -31,22 +59,29 @@ export default function Leaderboard() {
       });
   }, []);
 
-  const availableAdjacencyMethods = useMemo(() => {
-    const methods = new Set<string>();
-    for (const r of results) {
-      if (r.adjacency_method) methods.add(r.adjacency_method);
-    }
-    return [...methods].sort();
+  const options = useMemo(() => {
+    const datasets = new Set(results.map((r) => r.dataset));
+    const adjacencyMethods = new Set(results.map((r) => r.adjacency_method ?? 'baseline'));
+    adjacencyMethods.delete('baseline');
+    const readouts = new Set(results.map((r) => r.readout));
+    return {
+      datasets: DATASET_ORDER.filter((ds) => datasets.has(ds)),
+      ratios: [...new Set(results.map((r) => ratioKey(r.node_sample_ratio)))].sort(compareRatios),
+      adjacencyMethods: [...adjacencyMethods].sort(),
+      readouts: (Object.keys(READOUT_LABELS) as Readout[]).filter((r) => readouts.has(r)),
+    };
   }, [results]);
 
+  const filters = { method: methodFilter, ratio: ratioFilter, adjacencyMethod: adjacencyMethodFilter, readout: readoutFilter };
+
   const filteredResults = useMemo(
-    () => filterResults(results, datasetFilter, methodFilter, ratioFilter, adjacencyMethodFilter),
-    [results, datasetFilter, methodFilter, ratioFilter, adjacencyMethodFilter]
+    () => filterResults(results, { ...filters, dataset: datasetFilter }),
+    [results, datasetFilter, methodFilter, ratioFilter, adjacencyMethodFilter, readoutFilter]
   );
 
   const chartFilteredResults = useMemo(
-    () => filterResults(results, 'all', methodFilter, ratioFilter, adjacencyMethodFilter),
-    [results, methodFilter, ratioFilter, adjacencyMethodFilter]
+    () => filterResults(results, { ...filters, dataset: 'all' }),
+    [results, methodFilter, ratioFilter, adjacencyMethodFilter, readoutFilter]
   );
 
   const leaderboard = useMemo(
@@ -65,42 +100,21 @@ export default function Leaderboard() {
       parts.push(METHOD_LABELS[methodFilter]);
     }
     if (ratioFilter !== 'all') {
-      parts.push(`${RATIO_LABELS[ratioFilter]} nodes`);
+      parts.push(formatRatio(ratioFilter));
     }
     if (adjacencyMethodFilter !== 'all') {
       parts.push(ADJACENCY_METHOD_LABELS[adjacencyMethodFilter] ?? adjacencyMethodFilter);
     }
-    return parts.join(' • ');
-  }, [datasetFilter, methodFilter, ratioFilter, adjacencyMethodFilter]);
-
-  const allModelsData = useMemo(() => {
-    const allModels = [...MODEL_ORDER, ...BASELINE_MODELS];
-    return getModelsByDataset(chartFilteredResults, allModels, displayMetric, rankBy);
-  }, [chartFilteredResults, displayMetric, rankBy]);
-
-  const baselinesByDataset = useMemo(() => {
-    const baselines: Record<DatasetName, Record<string, { value: number; std: number }>> = {
-      motrpac: {},
-      addneuromed: {},
-      parkinsons: {},
-      brca: {},
-    };
-
-    for (const ds of ALL_DATASETS) {
-      for (const model of BASELINE_MODELS) {
-        const entries = chartFilteredResults.filter((r) => r.model === model && r.dataset === ds);
-        if (entries.length > 0) {
-          const metricValues = entries.map((e) => getDisplayMetricValue(e, displayMetric));
-          const value = metricValues.reduce((sum, m) => sum + m.value, 0) / metricValues.length;
-          const std = metricValues.reduce((sum, m) => sum + m.std, 0) / metricValues.length;
-          baselines[ds][model] = { value, std };
-        }
-      }
+    if (readoutFilter !== 'all') {
+      parts.push(READOUT_LABELS[readoutFilter]);
     }
-    return baselines;
-  }, [chartFilteredResults, displayMetric]);
+    return parts.join(' • ');
+  }, [datasetFilter, methodFilter, ratioFilter, adjacencyMethodFilter, readoutFilter]);
 
-  const filteredModels = MODEL_ORDER;
+  const allModelsData = useMemo(
+    () => getModelsByDataset(chartFilteredResults, CHART_MODELS, displayMetric, rankBy),
+    [chartFilteredResults, displayMetric, rankBy]
+  );
 
   const displayMetricLabel = DISPLAY_METRICS[displayMetric];
   const rankMetricLabel = RANKING_METRICS[rankBy];
@@ -116,15 +130,19 @@ export default function Leaderboard() {
     }
 
     if (ratioFilter !== 'all') {
-      title += ` at ${RATIO_LABELS[ratioFilter]} Sample-to-Node Ratio`;
+      title += ratioFilter === 'full' ? ' with All Features' : ` at Sample-to-Node Ratio ${ratioFilter}`;
     }
 
     if (adjacencyMethodFilter !== 'all') {
       title += ` — ${ADJACENCY_METHOD_LABELS[adjacencyMethodFilter] ?? adjacencyMethodFilter}`;
     }
 
+    if (readoutFilter !== 'all') {
+      title += ` — ${READOUT_LABELS[readoutFilter]}`;
+    }
+
     return title;
-  }, [displayMetricLabel, rankMetricLabel, methodFilter, ratioFilter, adjacencyMethodFilter]);
+  }, [displayMetricLabel, rankMetricLabel, methodFilter, ratioFilter, adjacencyMethodFilter, readoutFilter]);
 
   if (loading) {
     return (
@@ -134,203 +152,126 @@ export default function Leaderboard() {
     );
   }
 
+  const chartDatasets = options.datasets;
+  const numCols = chartDatasets.length <= 4 ? Math.max(chartDatasets.length, 1) : 3;
+  const numRows = Math.max(Math.ceil(chartDatasets.length / numCols), 1);
+  const innerHeight = numRows * FACET_HEIGHT + (numRows - 1) * FACET_ROW_GAP;
+  const chartHeight = innerHeight + CHART_MARGIN.t + CHART_MARGIN.b;
+  const colWidth = (1 - (numCols - 1) * FACET_COL_GAP) / numCols;
+
+  const facetValues = chartDatasets.flatMap((ds) => [...(allModelsData.get(ds)?.values() ?? [])]);
+  const maxValue = Math.max(...facetValues.map((d) => d.value + d.std), 0);
+  const minValue = Math.min(...facetValues.map((d) => d.value - d.std).filter((v) => v > 0), 1);
+  const yRange = [Math.max(0, minValue - 0.08), Math.min(1, maxValue + 0.12)];
+
   const facetedChartData: Plotly.Data[] = [];
   const facetedAnnotations: Partial<Plotly.Annotations>[] = [];
+  const facetedShapes: Partial<Plotly.Shape>[] = [];
+  const facetedLayout: Partial<Plotly.Layout> = {
+    height: chartHeight,
+    font: { family: 'DM Sans', size: 12, color: '#0f172a' },
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: '#ffffff',
+    margin: CHART_MARGIN,
+    annotations: facetedAnnotations,
+    shapes: facetedShapes,
+    showlegend: false,
+  };
 
-  ALL_DATASETS.forEach((ds, dsIdx) => {
-    const xAxisId = dsIdx === 0 ? 'x' : `x${dsIdx + 1}`;
-    const yAxisId = dsIdx === 0 ? 'y' : `y${dsIdx + 1}`;
+  chartDatasets.forEach((ds, dsIdx) => {
+    const row = Math.floor(dsIdx / numCols);
+    const col = dsIdx % numCols;
+    const axisNum = dsIdx === 0 ? '' : `${dsIdx + 1}`;
+    const top = 1 - (row * (FACET_HEIGHT + FACET_ROW_GAP)) / innerHeight;
+    const xDomain = [col * (colWidth + FACET_COL_GAP), col * (colWidth + FACET_COL_GAP) + colWidth];
+    const yDomain = [top - FACET_HEIGHT / innerHeight, top];
 
-    const values: number[] = [];
-    const errors: number[] = [];
-    const colors: string[] = [];
-    const textLabels: string[] = [];
-
-    for (const model of filteredModels) {
-      const data = allModelsData[ds][model];
-      if (data) {
-        values.push(data.value);
-        errors.push(data.std);
-        colors.push(MODEL_COLORS[model] || '#888888');
-        textLabels.push(`${(data.value * 100).toFixed(1)}%`);
-      } else {
-        values.push(0);
-        errors.push(0);
-        colors.push('#888888');
-        textLabels.push('');
-      }
-    }
+    const modelsData = allModelsData.get(ds);
+    const bars = CHART_MODELS.map((model) => modelsData?.get(model));
 
     facetedChartData.push({
       type: 'bar',
       name: DATASETS[ds].fullName,
-      x: filteredModels,
-      y: values,
+      x: CHART_LABELS,
+      y: bars.map((d) => d?.value ?? null),
+      customdata: bars.map((d) => d?.std ?? null),
       error_y: {
         type: 'data',
-        array: errors,
+        array: bars.map((d) => d?.std ?? 0),
         visible: true,
         color: '#333333',
         thickness: 1.5,
         width: 4,
       },
-      marker: { color: colors },
-      text: textLabels,
-      textposition: 'outside',
-      textfont: { family: 'JetBrains Mono', size: 10, color: '#0f172a' },
-      showlegend: false,
-      xaxis: xAxisId,
-      yaxis: yAxisId,
+      marker: { color: CHART_MODELS.map((m) => MODEL_COLORS[m] || '#888888') },
+      hovertemplate: `<b>%{x}</b><br>${displayMetricLabel}: %{y:.1%} ± %{customdata:.1%}<extra>${DATASETS[ds].fullName}</extra>`,
+      xaxis: `x${axisNum}`,
+      yaxis: `y${axisNum}`,
     } as Plotly.Data);
 
-    const baselineData = baselinesByDataset[ds];
+    // Bars start at 0, below the zoomed y-range, so value labels are pinned to the axis bottom.
+    bars.forEach((d, i) => {
+      if (!d) return;
+      facetedAnnotations.push({
+        text: `${(d.value * 100).toFixed(1)}%`,
+        xref: `x${axisNum}` as Plotly.XAxisName,
+        yref: `y${axisNum}` as Plotly.YAxisName,
+        x: CHART_LABELS[i],
+        y: yRange[0],
+        yshift: 4,
+        textangle: '-90',
+        xanchor: 'center',
+        yanchor: 'bottom',
+        showarrow: false,
+        font: { family: 'JetBrains Mono', size: 10, color: labelColor(MODEL_COLORS[CHART_MODELS[i]] || '#888888') },
+      });
+    });
 
-    if (baselineData.ElasticNet && filteredModels.length > 0) {
-      facetedChartData.push({
-        type: 'scatter',
-        mode: 'lines',
-        name: dsIdx === 0 ? 'Elastic Net' : undefined,
-        x: filteredModels,
-        y: Array(filteredModels.length).fill(baselineData.ElasticNet.value),
-        line: { color: '#000000', width: 2, dash: 'dash' },
-        showlegend: dsIdx === 0,
-        legendgroup: 'ElasticNet',
-        xaxis: xAxisId,
-        yaxis: yAxisId,
-        hoverinfo: 'y+name',
-        connectgaps: true,
-      } as Plotly.Data);
-    }
+    facetedShapes.push({
+      type: 'line',
+      xref: `x${axisNum}` as Plotly.XAxisName,
+      yref: `y${axisNum} domain` as Plotly.YAxisName,
+      x0: MODEL_ORDER.length - 0.5,
+      x1: MODEL_ORDER.length - 0.5,
+      y0: 0,
+      y1: 1,
+      line: { color: '#94a3b8', width: 1, dash: 'dot' },
+    });
 
-    if (baselineData.SVM && filteredModels.length > 0) {
-      facetedChartData.push({
-        type: 'scatter',
-        mode: 'lines',
-        name: dsIdx === 0 ? 'SVM' : undefined,
-        x: filteredModels,
-        y: Array(filteredModels.length).fill(baselineData.SVM.value),
-        line: { color: '#000000', width: 2, dash: 'dot' },
-        showlegend: dsIdx === 0,
-        legendgroup: 'SVM',
-        xaxis: xAxisId,
-        yaxis: yAxisId,
-        hoverinfo: 'y+name',
-        connectgaps: true,
-      } as Plotly.Data);
-    }
-
-    const colCenters = [0.125, 0.375, 0.625, 0.875];
     facetedAnnotations.push({
       text: `<b>${DATASETS[ds].emoji} ${DATASETS[ds].fullName}</b>`,
       xref: 'paper',
       yref: 'paper',
-      x: colCenters[dsIdx],
-      y: 1.08,
+      x: (xDomain[0] + xDomain[1]) / 2,
+      y: top,
+      yshift: 18,
       showarrow: false,
       font: { size: 14, color: '#1e293b', family: 'DM Sans' },
       xanchor: 'center',
       yanchor: 'bottom',
     });
+
+    const layoutAxes = facetedLayout as Record<string, unknown>;
+    layoutAxes[`xaxis${axisNum}`] = {
+      domain: xDomain,
+      anchor: `y${axisNum}`,
+      showgrid: false,
+      tickangle: -45,
+      tickfont: { size: 9, color: '#475569' },
+      fixedrange: true,
+    };
+    layoutAxes[`yaxis${axisNum}`] = {
+      domain: yDomain,
+      anchor: `x${axisNum}`,
+      title: col === 0 ? { text: displayMetricLabel, font: { size: 12 } } : undefined,
+      showgrid: true,
+      gridcolor: 'rgba(226,232,240,0.8)',
+      tickformat: '.0%',
+      tickfont: { size: 11, color: '#475569' },
+      fixedrange: true,
+      range: yRange,
+    };
   });
-
-  const allValuesWithError = ALL_DATASETS.flatMap((ds) =>
-    filteredModels.map((m) => {
-      const data = allModelsData[ds][m];
-      return data ? data.value + data.std : 0;
-    })
-  );
-  const allValuesOnly = ALL_DATASETS.flatMap((ds) =>
-    filteredModels.map((m) => {
-      const data = allModelsData[ds][m];
-      return data ? data.value : 0;
-    }).filter((v) => v > 0)
-  );
-  const baselineVals = ALL_DATASETS.flatMap((ds) =>
-    Object.values(baselinesByDataset[ds]).map((b) => b.value)
-  ).filter((v) => v > 0);
-  const maxValue = Math.max(...allValuesWithError, ...baselineVals, 0);
-  const minValue = Math.min(...allValuesOnly, ...baselineVals, 1);
-  const yRange = [Math.max(0, minValue - 0.08), Math.min(1, maxValue + 0.12)];
-
-  const facetedLayout: Partial<Plotly.Layout> = {
-    height: 420,
-    font: { family: 'DM Sans', size: 12, color: '#0f172a' },
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: '#ffffff',
-    margin: { l: 60, r: 20, t: 60, b: 80 },
-    annotations: facetedAnnotations,
-    legend: {
-      orientation: 'h',
-      yanchor: 'bottom',
-      y: 1.15,
-      xanchor: 'center',
-      x: 0.5,
-      bgcolor: 'rgba(0,0,0,0)',
-    },
-    grid: {
-      rows: 1,
-      columns: 4,
-      pattern: 'independent',
-      xgap: 0.06,
-    },
-    xaxis: {
-      showgrid: false,
-      tickangle: -45,
-      tickfont: { size: 9, color: '#475569' },
-      fixedrange: true,
-    },
-    xaxis2: {
-      showgrid: false,
-      tickangle: -45,
-      tickfont: { size: 9, color: '#475569' },
-      fixedrange: true,
-    },
-    xaxis3: {
-      showgrid: false,
-      tickangle: -45,
-      tickfont: { size: 9, color: '#475569' },
-      fixedrange: true,
-    },
-    xaxis4: {
-      showgrid: false,
-      tickangle: -45,
-      tickfont: { size: 9, color: '#475569' },
-      fixedrange: true,
-    },
-    yaxis: {
-      title: { text: displayMetricLabel, font: { size: 12 } },
-      showgrid: true,
-      gridcolor: 'rgba(226,232,240,0.8)',
-      tickformat: '.0%',
-      tickfont: { size: 11, color: '#475569' },
-      fixedrange: true,
-      range: yRange,
-    },
-    yaxis2: {
-      showgrid: true,
-      gridcolor: 'rgba(226,232,240,0.8)',
-      tickformat: '.0%',
-      tickfont: { size: 11, color: '#475569' },
-      fixedrange: true,
-      range: yRange,
-    },
-    yaxis3: {
-      showgrid: true,
-      gridcolor: 'rgba(226,232,240,0.8)',
-      tickformat: '.0%',
-      tickfont: { size: 11, color: '#475569' },
-      fixedrange: true,
-      range: yRange,
-    },
-    yaxis4: {
-      showgrid: true,
-      gridcolor: 'rgba(226,232,240,0.8)',
-      tickformat: '.0%',
-      tickfont: { size: 11, color: '#475569' },
-      fixedrange: true,
-      range: yRange,
-    },
-  };
 
   return (
     <div>
@@ -344,9 +285,9 @@ export default function Leaderboard() {
               onChange={(e) => setDatasetFilter(e.target.value as DatasetName | 'all')}
             >
               <option value="all">📊 All Datasets (Aggregate)</option>
-              {Object.entries(DATASETS).map(([key, ds]) => (
+              {options.datasets.map((key) => (
                 <option key={key} value={key}>
-                  {ds.emoji} {ds.fullName}
+                  {DATASETS[key].emoji} {DATASETS[key].fullName}
                 </option>
               ))}
             </select>
@@ -369,23 +310,17 @@ export default function Leaderboard() {
 
           <div className="control-group">
             <div className="control-label">Sample-Node Ratio</div>
-            <select
-              value={ratioFilter}
-              onChange={(e) => {
-                const val = e.target.value;
-                setRatioFilter(val === 'all' ? 'all' : parseFloat(val));
-              }}
-            >
+            <select value={ratioFilter} onChange={(e) => setRatioFilter(e.target.value)}>
               <option value="all">📏 All Ratios</option>
-              {VALID_RATIOS.map((ratio) => (
+              {options.ratios.map((ratio) => (
                 <option key={ratio} value={ratio}>
-                  📐 {RATIO_LABELS[ratio]}
+                  📐 {formatRatio(ratio)}
                 </option>
               ))}
             </select>
           </div>
 
-          {availableAdjacencyMethods.length > 0 && (
+          {options.adjacencyMethods.length > 0 && (
             <div className="control-group">
               <div className="control-label">Graph Construction</div>
               <select
@@ -393,9 +328,26 @@ export default function Leaderboard() {
                 onChange={(e) => setAdjacencyMethodFilter(e.target.value as string | 'all')}
               >
                 <option value="all">🔀 All Methods</option>
-                {availableAdjacencyMethods.map((m) => (
+                {options.adjacencyMethods.map((m) => (
                   <option key={m} value={m}>
                     🔹 {ADJACENCY_METHOD_LABELS[m] ?? m}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {options.readouts.length > 0 && (
+            <div className="control-group">
+              <div className="control-label">Readout</div>
+              <select
+                value={readoutFilter}
+                onChange={(e) => setReadoutFilter(e.target.value as Readout | 'all')}
+              >
+                <option value="all">🔀 All Readouts</option>
+                {options.readouts.map((r) => (
+                  <option key={r} value={r}>
+                    🔹 {READOUT_LABELS[r]}
                   </option>
                 ))}
               </select>
@@ -481,7 +433,7 @@ export default function Leaderboard() {
                         marginRight: '8px',
                       }}
                     />
-                    {entry.model}
+                    {MODEL_LABELS[entry.model] ?? entry.model}
                   </td>
                   <td className={`category-${entry.category}`}>{entry.category}</td>
                   <td className="mono-cell">
@@ -516,7 +468,7 @@ export default function Leaderboard() {
           data={facetedChartData}
           layout={facetedLayout}
           config={{ displayModeBar: false, responsive: true }}
-          style={{ width: '100%', height: '420px' }}
+          style={{ width: '100%', height: `${chartHeight}px` }}
         />
       </div>
     </div>

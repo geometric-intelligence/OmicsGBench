@@ -8,6 +8,7 @@ the hyperparameter config with the best best_val_f1_macro_mean.
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -54,13 +55,17 @@ def safe_float(val: object, default: float = 0.0) -> float:
         return default
 
 
+def ratio_key(val: object) -> str:
+    """'full' (every feature) stays distinct from 1.0 (as many features as training samples)."""
+    return 'full' if str(val) == 'full' else str(float(val))  # type: ignore[arg-type]
+
+
 def load_and_prepare_baseline(csv_path: Path) -> pd.DataFrame:
     """Load the baseline CSV and add missing columns to match GNN schema."""
     df = pd.read_csv(csv_path)
     df['adjacency_method'] = 'baseline'
     df['readout_name'] = 'baseline'
-    df['node_sample_ratio'] = df['node_sample_ratio'].replace('full', '1.0')
-    df['node_sample_ratio'] = df['node_sample_ratio'].astype(float)
+    df['node_sample_ratio'] = df['node_sample_ratio'].map(ratio_key)
     print(f'Loaded {len(df)} baseline rows from {csv_path}')
     return df
 
@@ -68,7 +73,7 @@ def load_and_prepare_baseline(csv_path: Path) -> pd.DataFrame:
 def load_and_prepare_gnn(csv_path: Path) -> pd.DataFrame:
     """Load the GNN results CSV."""
     df = pd.read_csv(csv_path)
-    df['node_sample_ratio'] = pd.to_numeric(df['node_sample_ratio'], errors='coerce')
+    df['node_sample_ratio'] = df['node_sample_ratio'].map(ratio_key)
     print(f'Loaded {len(df)} GNN rows from {csv_path}')
     return df
 
@@ -103,7 +108,7 @@ def transform_to_json(df: pd.DataFrame, output_path: Path) -> dict:
             'model': model,
             'dataset': dataset,
             'readout': readout,
-            'node_sample_ratio': safe_float(ratio),
+            'node_sample_ratio': ratio if ratio == 'full' else float(ratio),
             'method': method,
             'adjacency_method': adj_method if adj_method else 'baseline',
         }
@@ -130,12 +135,24 @@ def transform_to_json(df: pd.DataFrame, output_path: Path) -> dict:
 
 
 def main() -> int:
-    script_dir = Path(__file__).parent
-    webapp_dir = script_dir.parent
+    webapp_dir = Path(__file__).resolve().parent.parent
 
-    gnn_csv = webapp_dir / 'aggregated_final_results_neurips.csv'
-    baseline_csv = webapp_dir / 'baseline_aggregated_gnn_features_neurips.csv'
-    output_path = webapp_dir / 'public' / 'data' / 'results.json'
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        '--gnn-csv', type=Path, default=webapp_dir / 'aggregated_final_results_neurips.csv'
+    )
+    parser.add_argument(
+        '--baseline-csv',
+        type=Path,
+        default=webapp_dir / 'baseline_aggregated_gnn_features_neurips.csv',
+    )
+    parser.add_argument(
+        '--output', type=Path, default=webapp_dir / 'public' / 'data' / 'results.json'
+    )
+    args = parser.parse_args()
+    gnn_csv: Path = args.gnn_csv
+    baseline_csv: Path = args.baseline_csv
+    output_path: Path = args.output
 
     if not gnn_csv.exists():
         print(f'Error: GNN CSV not found at {gnn_csv}')

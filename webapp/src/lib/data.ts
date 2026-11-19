@@ -1,5 +1,14 @@
-import type { ResultEntry, GraphStats, LeaderboardEntry, DatasetName, RankingMetric, DisplayMetric } from './types';
-import { MODEL_CATEGORIES } from './constants';
+import type {
+  DatasetName,
+  DisplayMetric,
+  GraphStats,
+  GraphStatsMetric,
+  LeaderboardEntry,
+  RankingMetric,
+  Readout,
+  ResultEntry,
+} from './types';
+import { MODEL_CATEGORIES, ratioKey } from './constants';
 
 function getRankingMetricValue(entry: ResultEntry, metric: RankingMetric): { value: number; std: number } {
   switch (metric) {
@@ -29,6 +38,30 @@ export function getDisplayMetricValue(entry: ResultEntry, metric: DisplayMetric)
   }
 }
 
+function pickBest(entries: ResultEntry[], rankBy: RankingMetric): ResultEntry {
+  let bestEntry = entries[0];
+  let bestRankValue = getRankingMetricValue(bestEntry, rankBy).value;
+  for (const entry of entries) {
+    const rankValue = getRankingMetricValue(entry, rankBy).value;
+    if (rankValue > bestRankValue) {
+      bestEntry = entry;
+      bestRankValue = rankValue;
+    }
+  }
+  return bestEntry;
+}
+
+function groupBy<K extends string>(entries: ResultEntry[], key: (entry: ResultEntry) => K): Map<K, ResultEntry[]> {
+  const groups = new Map<K, ResultEntry[]>();
+  for (const entry of entries) {
+    const k = key(entry);
+    const group = groups.get(k);
+    if (group) group.push(entry);
+    else groups.set(k, [entry]);
+  }
+  return groups;
+}
+
 /**
  * For each model, selects the BEST configuration (highest ranking metric value)
  * rather than averaging across all configurations.
@@ -38,26 +71,9 @@ export function computeLeaderboard(
   rankBy: RankingMetric = 'val_f1_macro',
   displayMetric: DisplayMetric = 'test_f1_macro'
 ): LeaderboardEntry[] {
-  const byModel: Record<string, ResultEntry[]> = {};
-  for (const r of results) {
-    if (!byModel[r.model]) byModel[r.model] = [];
-    byModel[r.model].push(r);
-  }
-
-  const aggregates: LeaderboardEntry[] = Object.entries(byModel).map(([model, entries]) => {
+  const aggregates: LeaderboardEntry[] = [...groupBy(results, (r) => r.model)].map(([model, entries]) => {
     const isBaseline = entries.some((e) => e.readout === 'baseline');
-
-    let bestEntry = entries[0];
-    let bestRankValue = getRankingMetricValue(bestEntry, rankBy).value;
-
-    for (const entry of entries) {
-      const rankValue = getRankingMetricValue(entry, rankBy).value;
-      if (rankValue > bestRankValue) {
-        bestEntry = entry;
-        bestRankValue = rankValue;
-      }
-    }
-
+    const bestEntry = pickBest(entries, rankBy);
     const rankMetric = getRankingMetricValue(bestEntry, rankBy);
     const displayMetricVal = getDisplayMetricValue(bestEntry, displayMetric);
 
@@ -89,82 +105,44 @@ export function computeLeaderboard(
   return aggregates;
 }
 
-export function filterResults(
-  results: ResultEntry[],
-  dataset: DatasetName | 'all',
-  method: string | 'all' = 'all',
-  ratio: number | 'all' = 'all',
-  adjacencyMethod: string | 'all' = 'all'
-): ResultEntry[] {
-  let filtered = results;
+export interface ResultFilters {
+  dataset: DatasetName | 'all';
+  method: string | 'all';
+  ratio: string | 'all';
+  adjacencyMethod: string | 'all';
+  readout: Readout | 'all';
+}
 
-  if (dataset !== 'all') {
-    filtered = filtered.filter((r) => r.dataset === dataset);
-  }
-
-  if (method !== 'all') {
-    filtered = filtered.filter((r) => r.method === method);
-  }
-
-  if (ratio !== 'all') {
-    filtered = filtered.filter((r) => r.node_sample_ratio === ratio);
-  }
-
-  if (adjacencyMethod !== 'all') {
-    filtered = filtered.filter(
-      (r) => r.adjacency_method === adjacencyMethod || r.adjacency_method === 'baseline'
-    );
-  }
-
-  return filtered;
+/** Baselines have no graph and no readout, so the graph construction and readout filters keep them. */
+export function filterResults(results: ResultEntry[], filters: ResultFilters): ResultEntry[] {
+  const { dataset, method, ratio, adjacencyMethod, readout } = filters;
+  return results.filter(
+    (r) =>
+      (dataset === 'all' || r.dataset === dataset) &&
+      (method === 'all' || r.method === method) &&
+      (ratio === 'all' || ratioKey(r.node_sample_ratio) === ratio) &&
+      (adjacencyMethod === 'all' || r.adjacency_method === adjacencyMethod || r.adjacency_method === 'baseline') &&
+      (readout === 'all' || r.readout === readout || r.readout === 'baseline')
+  );
 }
 
 export function getStatsKey(
   dataset: string,
-  ratio: number,
+  ratio: string,
   method: string,
-  threshold: number,
-  adjacencyMethod?: string
+  threshold: string,
+  adjacencyMethod: string
 ): string {
-  if (adjacencyMethod) {
-    return `${dataset}|${ratio}|${method}|${threshold}|${adjacencyMethod}`;
-  }
-  return `${dataset}|${ratio}|${method}|${threshold}`;
+  return `${dataset}|${ratio}|${method}|${threshold}|${adjacencyMethod}`;
 }
 
-export function getStats(
-  allStats: Record<string, GraphStats>,
-  dataset: string,
-  ratio: number,
-  method: string,
-  threshold: number,
-  adjacencyMethod?: string
-): GraphStats | null {
-  const key = getStatsKey(dataset, ratio, method, threshold, adjacencyMethod);
-  return allStats[key] || null;
-}
-
-export function computeMetricMaxValues(stats: Record<string, GraphStats>): Record<string, number> {
-  const metrics = [
-    'num_nodes',
-    'num_edges',
-    'avg_degree',
-    'density_pct',
-    'avg_clustering_coeff',
-    'largest_cc_ratio_pct',
-    'avg_shortest_path_length',
-    'num_connected_components',
-    'degree_std',
-  ];
-
-  const maxValues: Record<string, number> = {};
-
-  for (const metric of metrics) {
-    const values = Object.values(stats).map((s) => s[metric as keyof GraphStats] as number);
-    maxValues[metric] = values.length > 0 ? Math.max(...values) * 1.2 : 1;
-  }
-
-  return maxValues;
+/** Axis range over `stats`, padded so the outside bar labels fit; null values are ignored. */
+export function computeMetricRange(stats: GraphStats[], metric: GraphStatsMetric): [number, number] {
+  const values = stats.map((s) => s[metric]).filter((v): v is number => v !== null && Number.isFinite(v));
+  if (values.length === 0) return [0, 1];
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  return [min < 0 ? min * 1.2 : 0, max > 0 ? max * 1.2 : 1];
 }
 
 export interface ModelDataByDataset {
@@ -179,54 +157,20 @@ export interface ModelDataByDataset {
 export function getModelsByDataset(
   results: ResultEntry[],
   modelOrder: string[],
-  displayMetric: DisplayMetric = 'test_f1_macro',
-  rankBy?: RankingMetric
-): Record<DatasetName, Record<string, ModelDataByDataset>> {
-  const rankMetric = rankBy || (displayMetric as unknown as RankingMetric) || 'val_f1_macro';
+  displayMetric: DisplayMetric,
+  rankBy: RankingMetric
+): Map<string, Map<string, ModelDataByDataset>> {
+  const modelsByDataset = new Map<string, Map<string, ModelDataByDataset>>();
+  const groups = groupBy(results, (r) => `${r.dataset}|${r.model}`);
 
-  const allDatasets: DatasetName[] = ['motrpac', 'addneuromed', 'parkinsons', 'brca'];
-
-  const byDatasetModel: Record<DatasetName, Record<string, ResultEntry[]>> = {
-    motrpac: {},
-    addneuromed: {},
-    parkinsons: {},
-    brca: {},
-  };
-
-  for (const r of results) {
-    const ds = r.dataset as DatasetName;
-    if (!byDatasetModel[ds]) continue;
-    if (!byDatasetModel[ds][r.model]) byDatasetModel[ds][r.model] = [];
-    byDatasetModel[ds][r.model].push(r);
-  }
-
-  const result: Record<DatasetName, Record<string, ModelDataByDataset>> = {
-    motrpac: {},
-    addneuromed: {},
-    parkinsons: {},
-    brca: {},
-  };
-
-  for (const ds of allDatasets) {
+  for (const dataset of new Set(results.map((r) => r.dataset))) {
+    const models = new Map<string, ModelDataByDataset>();
     for (const model of modelOrder) {
-      const entries = byDatasetModel[ds][model];
-      if (entries && entries.length > 0) {
-        let bestEntry = entries[0];
-        let bestRankValue = getRankingMetricValue(bestEntry, rankMetric).value;
-
-        for (const entry of entries) {
-          const rankValue = getRankingMetricValue(entry, rankMetric).value;
-          if (rankValue > bestRankValue) {
-            bestEntry = entry;
-            bestRankValue = rankValue;
-          }
-        }
-
-        const { value, std } = getDisplayMetricValue(bestEntry, displayMetric);
-        result[ds][model] = { value, std };
-      }
+      const entries = groups.get(`${dataset}|${model}`);
+      if (entries) models.set(model, getDisplayMetricValue(pickBest(entries, rankBy), displayMetric));
     }
+    modelsByDataset.set(dataset, models);
   }
 
-  return result;
+  return modelsByDataset;
 }

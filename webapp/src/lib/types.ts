@@ -5,7 +5,7 @@ export interface ResultEntry {
   model: string;
   dataset: string;
   readout: string; // 'NoReadOut' | 'OmicsReadOut' | 'baseline'
-  node_sample_ratio: number;
+  node_sample_ratio: number | 'full';
   method: string;
   adjacency_method?: string;
   val_f1_macro: number;
@@ -22,18 +22,38 @@ export interface ResultEntry {
   test_auroc_std: number;
 }
 
+/** Non-finite values (no edges: homophily, diameter) are serialized as null. */
 export interface GraphStats {
   num_nodes: number;
   num_edges: number;
-  density_pct: number;
   avg_degree: number;
-  degree_std: number;
-  num_connected_components: number;
+  density_pct: number;
   largest_cc_ratio_pct: number;
-  avg_clustering_coeff: number;
-  avg_shortest_path_length: number;
+  num_connected_components: number;
+  degree_std: number;
+  homophily: number | null;
+  clustering_coefficient: number | null;
+  diameter: number | null;
+  modularity: number | null;
   dataset: string;
+  adj_thresh: number;
+  node_sample_ratio: string;
+  method: string;
+  adjacency_method: string;
 }
+
+export type GraphStatsMetric =
+  | 'num_nodes'
+  | 'num_edges'
+  | 'avg_degree'
+  | 'density_pct'
+  | 'largest_cc_ratio_pct'
+  | 'num_connected_components'
+  | 'degree_std'
+  | 'homophily'
+  | 'clustering_coefficient'
+  | 'diameter'
+  | 'modularity';
 
 export interface LeaderboardEntry {
   rank: number;
@@ -56,11 +76,11 @@ export interface DatasetInfo {
   emoji: string;
 }
 
-export type DatasetName = 'motrpac' | 'addneuromed' | 'parkinsons' | 'brca';
+export type DatasetName = 'motrpac' | 'addneuromed' | 'parkinsons' | 'brca' | 'tuberculosis' | 'smoking';
 
 export type NodeSelectionMethod = 'variance' | 'correlation' | 'distance_correlation' | 'random';
 
-export type SampleNodeRatio = 0.3 | 0.5 | 0.8 | 1.0;
+export type Readout = 'OmicsReadOut' | 'NoReadOut';
 
 export type RankingMetric = 'val_f1_macro' | 'test_f1_macro';
 
