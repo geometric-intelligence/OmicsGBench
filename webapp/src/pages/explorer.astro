@@ -3,14 +3,18 @@ import Layout from '../layouts/Layout.astro';
 import Logo from '../components/Logo';
 import Footer from '../components/Footer.astro';
 import ExplorerComponent from '../components/Explorer';
+import Citation from '../components/Citation.astro';
 ---
 
-<Layout title="OgBench Dataset Explorer">
+<Layout
+  title="OmicsGBench Dataset Explorer"
+  description="OmicsGBench dataset explorer: graph statistics of omics datasets across node selection and graph construction settings."
+>
   <!-- Header -->
   <div class="header">
     <Logo size={120} className="header-logo" client:load />
     <div class="header-badge">DATASET EXPLORER</div>
-    <h1>OgBench Dataset Explorer</h1>
+    <h1>OmicsGBench Dataset Explorer</h1>
     <p class="header-subtitle">
       Interactive visualization of omics dataset graph properties
     </p>
@@ -24,5 +28,7 @@ import ExplorerComponent from '../components/Explorer';
   <!-- Explorer Component -->
   <ExplorerComponent client:only="react" />
 
-  <Footer text="OgBench Dataset Explorer" />
+  <Citation />
+
+  <Footer text="OmicsGBench Dataset Explorer" />
 </Layout>

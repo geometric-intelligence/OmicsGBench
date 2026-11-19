@@ -1,0 +1,51 @@
+# Builds webapp/ and publishes it to https://omicsgbench.github.io.
+# Requires the GitHub org `omicsgbench` with repo `omicsgbench.github.io`, whose deploy key
+# (write access) is stored here as the WEBSITE_DEPLOY_KEY secret. See webapp/README.md.
+
+name: Deploy Website
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-website
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: webapp
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and build
+        run: make lint build
+
+      - name: Publish to omicsgbench.github.io
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.WEBSITE_DEPLOY_KEY }}
+          external_repository: omicsgbench/omicsgbench.github.io
+          publish_branch: main
+          publish_dir: webapp/dist
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          full_commit_message: Deploy ${{ github.repository }}@${{ github.sha }}

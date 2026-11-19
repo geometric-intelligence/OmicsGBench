@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 .PHONY: help dev build preview stats lint clean install deps deploy
 
-PROJECT ?= ogbench
+PROJECT ?= omicsgbench
 DIST_DIR ?= dist
 NPM ?= npm
 PYTHON ?= python3
@@ -11,9 +11,9 @@ WRANGLER ?= npx --yes wrangler
 help:
 	@echo "Available targets:"
 	@echo "  dev      - Start development server"
-	@echo "  build    - Build for production (runs stats first to refresh Dataset Explorer data)"
+	@echo "  build    - Build for production from the committed public/data/*.json"
 	@echo "  preview  - Preview production build"
-	@echo "  stats    - Regenerate public/data/stats.json from tutorials/stats/*.csv"
+	@echo "  stats    - Regenerate public/data/stats.json from the stats CSVs (review the diff before committing)"
 	@echo "  lint     - Typecheck (astro check)"
 	@echo "  clean    - Clean build artifacts"
 	@echo "  install  - Install dependencies"
@@ -30,7 +30,8 @@ dev: build
 stats:
 	$(PYTHON) scripts/build_stats_from_csv.py
 
-build: stats
+# The stats CSVs are not all in the repo (BRCA WGCNA is missing), so build never regenerates stats.json.
+build:
 	$(NPM) run build
 
 preview:

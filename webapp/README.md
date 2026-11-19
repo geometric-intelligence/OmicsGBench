@@ -1,6 +1,6 @@
-# OgBench Webapp
+# OmicsGBench Webapp
 
-Static website for the OgBench (Omics Graph Benchmark) leaderboard and dataset explorer. Built with Astro, React, and Plotly.js.
+Static website for the OmicsGBench leaderboard and dataset explorer, served at [omicsgbench.github.io](https://omicsgbench.github.io). Built with Astro, React, and Plotly.js.
 
 ## Architecture
 
@@ -18,10 +18,12 @@ webapp/
 │   │   ├── Explorer.tsx      # React: sliders, 9-chart grid
 │   │   ├── Logo.tsx          # React: SVG logo
 │   │   ├── Header.astro      # Astro: page header
+│   │   ├── Citation.astro    # Astro: paper links + BibTeX with copy button
 │   │   └── Footer.astro      # Astro: page footer
 │   ├── lib/               # Utilities
 │   │   ├── types.ts       # TypeScript interfaces
 │   │   ├── constants.ts   # Datasets, models, colors
+│   │   ├── paper.ts       # Paper metadata, links, BibTeX (citation block + meta tags)
 │   │   └── data.ts        # Data processing functions
 │   ├── layouts/
 │   │   └── Layout.astro   # Base HTML layout
@@ -38,6 +40,8 @@ webapp/
 4. **Charts**: Plotly.js renders interactive visualizations
 
 The site is fully static — no server required. All interactivity runs in the browser.
+
+Every page ends with the citation block, and `Layout.astro` emits Google Scholar `citation_*`, Open Graph, and canonical-URL tags. All of them read `src/lib/paper.ts`, so update the paper metadata there.
 
 ## Development
 
@@ -64,23 +68,30 @@ make preview
 
 ## Deployment
 
-Deploy to Cloudflare Pages:
+### GitHub Pages (omicsgbench.github.io)
+
+The site is a root-level GitHub Pages site (`site: 'https://omicsgbench.github.io'` in `astro.config.mjs`, no `base`), so it lives in the repo `omicsgbench/omicsgbench.github.io`. The [Deploy Website](../.github/workflows/deploy-website.yml) workflow builds `webapp/` and pushes `dist/` to that repo's `main` branch. It only runs when triggered manually.
+
+One-time setup:
+
+1. Create the GitHub organization `omicsgbench` and a public repo `omicsgbench.github.io` in it.
+2. Generate a key pair: `ssh-keygen -t ed25519 -N "" -C omicsgbench-website -f deploy_key`.
+3. In `omicsgbench/omicsgbench.github.io` → Settings → Deploy keys, add `deploy_key.pub` with **write access**.
+4. In `geometric-intelligence/OmicsGBench` → Settings → Secrets and variables → Actions, add the private key `deploy_key` as `WEBSITE_DEPLOY_KEY`.
+5. Run the workflow: Actions → Deploy Website → Run workflow (or `gh workflow run deploy-website.yml`).
+6. In `omicsgbench.github.io` → Settings → Pages, set the source to "Deploy from a branch", `main`, `/ (root)`.
+
+### Cloudflare Pages
 
 ```bash
 make deploy
 ```
 
-This runs `wrangler pages deploy dist/ --project-name ogbench`.
+This runs `wrangler pages deploy dist/ --project-name omicsgbench`, which serves the site at `omicsgbench.pages.dev`. Cloudflare can't rename a Pages project; the old `ogbench` project at `ogbench.pages.dev` keeps serving the previous build until it is deleted in the Cloudflare dashboard.
 
-### Manual Deployment
+### Other hosts
 
-The `dist/` directory contains all static files. Deploy to any static host:
-
-- **Cloudflare Pages**: `npx wrangler pages deploy dist/`
-- **Vercel**: `vercel deploy dist/`
-- **Netlify**: drag & drop `dist/` folder
-- **GitHub Pages**: copy `dist/` contents to repo
-- **Any web server**: serve `dist/` as static files
+The `dist/` directory contains all static files and can be served from any static host (Vercel, Netlify, any web server). Pages and data are referenced with root-absolute paths (`/explorer`, `/data/*.json`), so serve the site from the root of a domain. Serving it under a subpath also requires setting `base` in `astro.config.mjs`.
 
 ## Updating Data
 
@@ -93,13 +104,7 @@ If you already have the graph-statistics CSV files (e.g. from a previous run of 
 python webapp/scripts/build_stats_from_csv.py
 ```
 
-This reads:
-
-- `tutorials/stats/addneuromed/graph_stats_comprehensive_addneuro.csv`
-- `tutorials/stats/motrpac/graph_stats_comprehensive_motrpac.csv`
-- `tutorials/stats/parkinsons/graph_stats_comprehensive_parkinsons.csv`
-
-and writes `webapp/public/data/stats.json`. Run this after updating any of those CSVs or when setting up the webapp on a fresh clone so the Dataset Explorer has data. The Explorer’s Node Sample Ratio and Adjacency Threshold sliders will only show values that exist in the generated stats. If the CSVs contain an `adjacency_method` column, it will be included in the key and the Explorer will show a Graph Construction dropdown.
+This reads the co-expression CSVs `tutorials/stats/<dataset>/graph_stats_comprehensive_<dataset>.csv` and the PPI CSVs `stats/<dataset>/graph_stats_comprehensive.csv` for `addneuromed`, `motrpac`, `parkinsons`, and `brca`, and writes `webapp/public/data/stats.json`. Missing CSVs are skipped silently. `tutorials/stats/brca/graph_stats_comprehensive_brca.csv` is not in the repo, so a regeneration from a fresh clone drops the 120 BRCA co-expression entries from the committed `stats.json`; check `git diff --stat public/data/stats.json` before committing. `make build` doesn't regenerate stats, so builds and deploys always use the committed JSON. Run this after updating any of those CSVs or when setting up the webapp on a fresh clone so the Dataset Explorer has data. The Explorer’s Node Sample Ratio and Adjacency Threshold sliders will only show values that exist in the generated stats. If the CSVs contain an `adjacency_method` column, it will be included in the key and the Explorer will show a Graph Construction dropdown.
 
 ### Regenerating Graph Statistics (full pipeline)
 
@@ -107,18 +112,7 @@ The `tutorials/dataset_stats_analysis.py` script computes graph statistics for a
 
 **Prerequisites:**
 
-The script requires the full `ogbench` environment with PyTorch:
-
-```bash
-# Install PyTorch (see https://pytorch.org for platform-specific instructions)
-pip install torch
-
-# Install other dependencies
-pip install torch-geometric networkx numpy pandas scikit-learn huggingface_hub joblib omegaconf
-
-# Install ogbench package (from repo root)
-pip install -e .
-```
+The script needs the full `omicsgbench` Python environment with PyTorch. Set it up as described under Installation in the [main README](../README.md#installation).
 
 **Run the script:**
 
@@ -138,13 +132,13 @@ This will:
 
 **Parameters computed:**
 
-| Parameter            | Values                                                      |
-| -------------------- | ----------------------------------------------------------- |
-| Datasets             | `motrpac`, `addneuromed`, `parkinsons`, `covidaki`          |
-| Node sample ratios   | `full`, `1.0`, `0.5`, `0.3`                                 |
-| Selection methods    | `variance`, `correlation`, `distance_correlation`, `random` |
-| Adjacency thresholds | 10 values from 0.0 to 1.0                                   |
-| Graph construction   | `string` (PPI Network), `wgcna` (Co-expression)             |
+| Parameter            | Values                                                                    |
+| -------------------- | ------------------------------------------------------------------------- |
+| Datasets             | `motrpac`, `tuberculosis`, `parkinsons`, `addneuromed`, `smoking`, `brca` |
+| Node sample ratios   | `full`, `1.0`, `0.5`, `0.3`                                               |
+| Selection methods    | `variance`, `correlation`, `distance_correlation`, `random`               |
+| Adjacency thresholds | 10 values from 0.0 to 1.0                                                 |
+| Graph construction   | `string` (PPI Network), `wgcna` (Co-expression)                           |
 
 **Metrics computed per graph:**
 
@@ -209,11 +203,7 @@ This will:
    - For **stats.json** (Dataset Explorer): run `python webapp/scripts/build_stats_from_csv.py` from the repo root if you have the graph-statistics CSVs (see [Building stats.json from existing CSVs](#building-statsjson-from-existing-csvs)), or copy a pre-built file: `cp /path/to/new/stats.json public/data/stats.json`
    - For **results.json** (Leaderboard): `cp /path/to/new/results.json public/data/results.json`
 
-2. **Rebuild and deploy**:
-
-   ```bash
-   make deploy
-   ```
+2. **Rebuild and deploy**: commit the new JSON files, then run the Deploy Website workflow (`gh workflow run deploy-website.yml`). See [Deployment](#deployment) for Cloudflare Pages.
 
 ### Key Format
 
@@ -222,13 +212,13 @@ Stats key: `{dataset}|{ratio}|{method}|{threshold}|{adjacency_method}`
 
 Where:
 
-- `dataset`: `motrpac`, `addneuromed`, `parkinsons`, or `covidaki`
+- `dataset`: `motrpac`, `addneuromed`, `parkinsons`, `brca`, `tuberculosis`, or `smoking` (the current results and stats cover the first four)
 - `ratio`: node sample ratio (`full`, `1.0`, `0.5`, `0.3`)
 - `method`: `variance`, `correlation`, `distance_correlation`, or `random`
 - `threshold`: adjacency threshold (0.0–1.0)
 - `readout`: `NoReadOut`, `OmicsReadOut`, or `baseline`
 - `adjacency_method`: `string` (PPI Network) or `wgcna` (Co-expression)
-- `model`: `SVM`, `ElasticNet`, `MLP`, `GATv4`, `GATv2`, `GIN`, `GCN`, `GraphSAGE`, `SAGN`, `Random`
+- `model`: `SVM`, `ElasticNet`, `MLP`, `MLA-GNN` (the `gatv4` config), `GATv2`, `GIN`, `GCN`, `GraphSAGE`, `SAGN`, `ChebNet`, `GPS`
 
 The `adjacency_method` segment is optional for backward compatibility — keys without it are treated as having a single graph construction method.
 
@@ -238,4 +228,4 @@ The `adjacency_method` segment is optional for backward compatibility — keys w
 - **[React](https://react.dev/)** — Interactive components (islands)
 - **[Plotly.js](https://plotly.com/javascript/)** — Charts
 - **[Tailwind CSS](https://tailwindcss.com/)** — Styling
-- **[Cloudflare Pages](https://pages.cloudflare.com/)** — Hosting
+- **[GitHub Pages](https://pages.github.com/)** — Hosting ([Cloudflare Pages](https://pages.cloudflare.com/) also supported)

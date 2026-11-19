@@ -1,0 +1,50 @@
+---
+import { BIBTEX, PAPER, PAPER_LINKS } from '../lib/paper';
+---
+
+<section class="citation-section" id="citation" aria-labelledby="citation-title">
+  <div class="section-header">
+    <h2 class="section-title" id="citation-title">Citation</h2>
+    <button type="button" class="citation-copy" data-copy-target="citation-bibtex">Copy BibTeX</button>
+  </div>
+  <div class="citation-body">
+    <p class="citation-paper">
+      <a href={PAPER.arxivUrl} target="_blank" rel="noopener">{PAPER.title}</a>
+    </p>
+    <p class="citation-authors">{PAPER.authors.join(', ')}</p>
+    <p class="citation-venue">{PAPER.venue}</p>
+    <div class="citation-links">
+      {
+        PAPER_LINKS.map((link) => (
+          <a href={link.href} class="citation-link" target="_blank" rel="noopener">
+            {link.label}
+          </a>
+        ))
+      }
+    </div>
+    <pre class="citation-bibtex" id="citation-bibtex"><code>{BIBTEX}</code></pre>
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('.citation-copy').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const target = document.getElementById(button.dataset.copyTarget ?? '');
+      if (!target) return;
+      const label = button.textContent;
+      try {
+        await navigator.clipboard.writeText(target.textContent ?? '');
+        button.textContent = 'Copied!';
+      } catch {
+        const range = document.createRange();
+        range.selectNodeContents(target);
+        window.getSelection()?.removeAllRanges();
+        window.getSelection()?.addRange(range);
+        button.textContent = 'Press Ctrl+C / Cmd+C';
+      }
+      setTimeout(() => {
+        button.textContent = label;
+      }, 2000);
+    });
+  });
+</script>
