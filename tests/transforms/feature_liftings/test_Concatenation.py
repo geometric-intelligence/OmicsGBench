@@ -2,7 +2,7 @@
 
 import torch
 
-from ogbench.transforms.liftings.graph2simplicial import SimplicialCliqueLifting
+from omicsgbench.transforms.liftings.graph2simplicial import SimplicialCliqueLifting
 
 
 class TestConcatention:

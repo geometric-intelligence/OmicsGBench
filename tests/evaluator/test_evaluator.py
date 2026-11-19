@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from ogbench.evaluator import TBEvaluator
+from omicsgbench.evaluator import TBEvaluator
 
 
 class TestTBEvaluator:

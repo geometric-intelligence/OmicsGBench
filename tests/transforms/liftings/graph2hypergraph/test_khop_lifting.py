@@ -2,7 +2,7 @@
 
 import torch
 
-from ogbench.transforms.liftings.graph2hypergraph import HypergraphKHopLifting
+from omicsgbench.transforms.liftings.graph2hypergraph import HypergraphKHopLifting
 
 
 class TestHypergraphKHopLifting:

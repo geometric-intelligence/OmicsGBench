@@ -3,7 +3,7 @@
 import torch
 from torch_geometric.data import Data
 
-from ogbench.nn.encoders.flat_encoder import FlatEncoder
+from omicsgbench.nn.encoders.flat_encoder import FlatEncoder
 
 
 def test_flat_encoder_forward():

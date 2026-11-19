@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+message: "If you use OmicsGBench, please cite the paper below."
+title: "OmicsGBench"
+type: software
+license: MIT
+version: 1.0.0
+repository-code: "https://github.com/geometric-intelligence/OmicsGBench"
+url: "https://omicsgbench.github.io"
+authors:
+  - family-names: Cornelis
+    given-names: Louisa
+  - family-names: Mathe
+    given-names: Johan
+  - family-names: Van Langendonck
+    given-names: Louis
+  - family-names: Bernárdez
+    given-names: Guillermo
+  - family-names: Miolane
+    given-names: Nina
+preferred-citation:
+  type: conference-paper
+  title: "OmicsGBench: A Framework for Evaluating Graph Neural Networks on Omics Data"
+  authors:
+    - family-names: Cornelis
+      given-names: Louisa
+    - family-names: Mathe
+      given-names: Johan
+    - family-names: Van Langendonck
+      given-names: Louis
+    - family-names: Bernárdez
+      given-names: Guillermo
+    - family-names: Miolane
+      given-names: Nina
+  collection-title: "Advances in Neural Information Processing Systems (NeurIPS), Datasets and Benchmarks Track"
+  year: 2026
+  url: "https://arxiv.org/abs/2605.15511"
+  identifiers:
+    - type: other
+      value: "arXiv:2605.15511"
+      description: arXiv preprint

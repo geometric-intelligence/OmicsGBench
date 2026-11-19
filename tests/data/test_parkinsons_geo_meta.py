@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from ogbench.data.utils.split_utils import group_kfold_is_feasible
+from omicsgbench.data.utils.split_utils import group_kfold_is_feasible
 from scripts.processors.parkinsons import (
     _infer_batch_field,
     _parse_geo_sample_characteristics,

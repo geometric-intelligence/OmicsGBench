@@ -6,7 +6,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from ogbench.data.utils.split_utils import print_group_split_inventory
+from omicsgbench.data.utils.split_utils import print_group_split_inventory
 from scripts.utils import create_dataset_metadata, download_file, upload_to_huggingface
 
 

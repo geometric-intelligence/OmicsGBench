@@ -6,8 +6,8 @@ import pytest
 import torch
 import torch_geometric
 
-from ogbench.transforms.liftings.graph2cell import CellCycleLifting
-from ogbench.transforms.liftings.graph2simplicial import SimplicialCliqueLifting
+from omicsgbench.transforms.liftings.graph2cell import CellCycleLifting
+from omicsgbench.transforms.liftings.graph2simplicial import SimplicialCliqueLifting
 
 
 @pytest.fixture
@@ -269,10 +269,10 @@ def random_graph_input():
 def mock_string_network_calls():
     """Mock STRING network calls to avoid timeouts in CI."""
     with patch(
-        'ogbench.data.adjacency.string.STRINGAdjacencyBuilder._map_to_string_ids',
+        'omicsgbench.data.adjacency.string.STRINGAdjacencyBuilder._map_to_string_ids',
         return_value={},
     ), patch(
-        'ogbench.data.adjacency.string.STRINGAdjacencyBuilder._fetch_interactions',
+        'omicsgbench.data.adjacency.string.STRINGAdjacencyBuilder._fetch_interactions',
         return_value=[],
     ):
         yield

@@ -4,7 +4,7 @@ import pytest
 import torch
 from torch_geometric.data import Data
 
-from ogbench.transforms.liftings import AbstractLifting
+from omicsgbench.transforms.liftings import AbstractLifting
 
 
 class TestAbstractLifting:

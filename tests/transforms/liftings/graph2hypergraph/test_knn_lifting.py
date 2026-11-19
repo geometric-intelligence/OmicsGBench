@@ -4,7 +4,7 @@ import pytest
 import torch
 from torch_geometric.data import Data
 
-from ogbench.transforms.liftings.graph2hypergraph import HypergraphKNNLifting
+from omicsgbench.transforms.liftings.graph2hypergraph import HypergraphKNNLifting
 
 
 class TestHypergraphKNNLifting:

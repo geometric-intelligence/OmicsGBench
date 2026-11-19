@@ -1,0 +1,28 @@
+"""This module contains the transforms for the omicsgbench package."""
+
+from typing import Any
+
+from omicsgbench.transforms.data_manipulations import DATA_MANIPULATIONS
+from omicsgbench.transforms.feature_liftings import FEATURE_LIFTINGS
+from omicsgbench.transforms.liftings.graph2cell import GRAPH2CELL_LIFTINGS
+from omicsgbench.transforms.liftings.graph2hypergraph import GRAPH2HYPERGRAPH_LIFTINGS
+from omicsgbench.transforms.liftings.graph2simplicial import GRAPH2SIMPLICIAL_LIFTINGS
+
+LIFTINGS = {
+    **GRAPH2CELL_LIFTINGS,
+    **GRAPH2HYPERGRAPH_LIFTINGS,
+    **GRAPH2SIMPLICIAL_LIFTINGS,
+}
+
+TRANSFORMS: dict[Any, Any] = {
+    **LIFTINGS,
+    **FEATURE_LIFTINGS,
+    **DATA_MANIPULATIONS,
+}
+
+__all__ = [
+    'DATA_MANIPULATIONS',
+    'FEATURE_LIFTINGS',
+    'LIFTINGS',
+    'TRANSFORMS',
+]

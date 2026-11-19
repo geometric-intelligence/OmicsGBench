@@ -73,7 +73,7 @@ jobs:
       - name: Run tests and collect coverage
         env:
           HF_HUB_ENABLE_HF_TRANSFER: "0"
-        run: pytest --cov ogbench # NEEDS TO BE UPDATED WHEN CHANGING THE NAME OF "src" FOLDER
+        run: pytest --cov omicsgbench
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

@@ -4,7 +4,7 @@ import pytest
 import torch
 from torch_geometric.data import Data
 
-from ogbench.transforms.liftings import GraphLifting
+from omicsgbench.transforms.liftings import GraphLifting
 
 
 class ConcreteGraphLifting(GraphLifting):

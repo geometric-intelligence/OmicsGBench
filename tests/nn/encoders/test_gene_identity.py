@@ -7,9 +7,9 @@ import torch
 from omegaconf import OmegaConf
 from torch_geometric.data import Data
 
-from ogbench.nn.encoders.all_cell_encoder import AllCellFeatureEncoder
-from ogbench.nn.encoders.flat_encoder import FlatEncoder
-from ogbench.nn.encoders.gene_identity import (
+from omicsgbench.nn.encoders.all_cell_encoder import AllCellFeatureEncoder
+from omicsgbench.nn.encoders.flat_encoder import FlatEncoder
+from omicsgbench.nn.encoders.gene_identity import (
     GeneIdentityFeatureEncoder,
     LearnableGeneIdentityBank,
     apply_gene_identity_to_model,

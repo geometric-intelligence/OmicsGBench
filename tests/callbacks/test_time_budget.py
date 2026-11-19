@@ -13,9 +13,9 @@ from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 from torch.utils.data import DataLoader, TensorDataset
 
-from ogbench.callbacks.time_budget import TimeBudget
-from ogbench.utils.config_resolvers import register_all_resolvers
-from ogbench.utils.hparam_search import DEADLINE_ENV_VAR
+from omicsgbench.callbacks.time_budget import TimeBudget
+from omicsgbench.utils.config_resolvers import register_all_resolvers
+from omicsgbench.utils.hparam_search import DEADLINE_ENV_VAR
 
 CONFIG_DIR = Path(__file__).resolve().parents[2] / 'configs'
 

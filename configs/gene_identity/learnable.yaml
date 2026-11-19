@@ -1,8 +1,8 @@
 # Learnable per-node identity embedding for shared, fixed-order graphs.
 #
 # Usage:
-#   python -m ogbench gene_identity=learnable
-#   python -m ogbench gene_identity=learnable gene_identity.embed_dim=64
+#   python -m omicsgbench gene_identity=learnable
+#   python -m omicsgbench gene_identity=learnable gene_identity.embed_dim=64
 
 mode: learnable
 embed_dim: 32

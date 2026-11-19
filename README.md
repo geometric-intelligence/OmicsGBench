@@ -1,15 +1,21 @@
-[![Code Quality](https://github.com/geometric-intelligence/ogbench/actions/workflows/code-quality-main.yaml/badge.svg)](https://github.com/geometric-intelligence/ogbench/actions/workflows/code-quality-main.yaml)
-[![Dependencies](https://github.com/geometric-intelligence/ogbench/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/geometric-intelligence/ogbench/actions/workflows/dependabot/dependabot-updates)
-[![Tests](https://github.com/geometric-intelligence/ogbench/actions/workflows/test.yml/badge.svg)](https://github.com/geometric-intelligence/ogbench/actions/workflows/test.yml)
+[![Code Quality](https://github.com/geometric-intelligence/OmicsGBench/actions/workflows/code-quality-main.yaml/badge.svg)](https://github.com/geometric-intelligence/OmicsGBench/actions/workflows/code-quality-main.yaml)
+[![Dependencies](https://github.com/geometric-intelligence/OmicsGBench/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/geometric-intelligence/OmicsGBench/actions/workflows/dependabot/dependabot-updates)
+[![Tests](https://github.com/geometric-intelligence/OmicsGBench/actions/workflows/test.yml/badge.svg)](https://github.com/geometric-intelligence/OmicsGBench/actions/workflows/test.yml)
+[![arXiv](https://img.shields.io/badge/arXiv-2605.15511-b31b1b.svg)](https://arxiv.org/abs/2605.15511)
+[![NeurIPS 2026](https://img.shields.io/badge/NeurIPS%202026-Datasets%20%26%20Benchmarks-4b44ce.svg)](https://arxiv.org/abs/2605.15511)
+[![Website](https://img.shields.io/badge/website-omicsgbench.github.io-2ea44f.svg)](https://omicsgbench.github.io)
+[![Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20Hub-omicsgbench-ffcc4d.svg)](https://huggingface.co/datasets/geometric-intelligence/omicsgbench)
 
-# OGBench — Omics Graph Benchmarking
+# OmicsGBench: A Framework for Evaluating Graph Neural Networks on Omics Data
 
-A benchmarking framework for Graph Neural Networks on omics datasets. OGBench provides standardized datasets, graph construction pipelines, GNN architectures, and sklearn baselines to enable fair comparison of models on biological classification tasks (genomics, transcriptomics, proteomics).
+OmicsGBench (Omics-Graph Bench) is a benchmarking framework for graph-level prediction on omics expression data, where each patient sample is a graph whose nodes are genes or proteins. It targets the n ≪ p regime typical of omics (few samples, large graphs) and provides standardized datasets, graph construction pipelines, GNN architectures, and sklearn baselines for fair comparison on transcriptomic, proteomic, and epigenomic classification tasks.
+
+Paper: [OmicsGBench: A Framework for Evaluating Graph Neural Networks on Omics Data](https://arxiv.org/abs/2605.15511) (NeurIPS 2026 Datasets and Benchmarks Track). Leaderboard and dataset explorer: [omicsgbench.github.io](https://omicsgbench.github.io).
 
 ## Overview
 
 - **6 curated omics datasets** on Hugging Face Hub with automatic download
-- **9 GNN architectures** — GCN, GATv2, GATv4, GIN, GraphSAGE, ChebNet, SAGN, GPS, MLP
+- **8 GNN architectures plus an MLP baseline** — GCN, GATv2, GATv4, GIN, GraphSAGE, ChebNet, SAGN, GPS, and MLP
 - **2 graph construction methods** — WGCNA co-expression and STRING protein-protein interaction
 - **Five-fold evaluation** with every preprocessing step fit on the training split only
 - **Optuna hyperparameter search** scored on the mean validation macro F1 across folds
@@ -20,41 +26,52 @@ A benchmarking framework for Graph Neural Networks on omics datasets. OGBench pr
 
 ## Installation
 
+Requires Python 3.12.
+
 ```bash
-git clone git@github.com:geometric-intelligence/ogbench.git
-cd ogbench
+git clone https://github.com/geometric-intelligence/OmicsGBench.git
+cd OmicsGBench
 
-conda create -n ogbench python=3.12
 curl -LsSf https://astral.sh/uv/install.sh | sh
-conda activate ogbench
-
-uv venv
+conda create -n omicsgbench python=3.12 -y
+conda activate omicsgbench
 uv pip install -e '.[all]'
 
 pre-commit install
 ```
 
-A CLI entry point is also installed: `ogbench-train` (equivalent to `python ogbench/run.py`).
+`uv pip install` installs into the active conda environment. Without conda, use `uv venv --python 3.12 && source .venv/bin/activate` instead of the two `conda` lines. `bash env_setup.sh` does the conda setup in one step, installing Miniconda first if it is missing (Linux only).
+
+The PyTorch Geometric extensions (`torch-scatter`, `torch-sparse`, `torch-cluster`, `pyg-lib`) are resolved from the CUDA 12.8 wheel index pinned under `[tool.uv]` in `pyproject.toml`, which matches the default `torch==2.8.0` Linux wheels. On CPU-only machines or macOS, point uv at the CPU index:
+
+```bash
+uv pip install -e '.[all]' --find-links https://data.pyg.org/whl/torch-2.8.0+cpu.html
+```
+
+Installing the package also adds the `omicsgbench-train` command, equivalent to `python -m omicsgbench`. Training defaults to `trainer=gpu`; pass `trainer=cpu` or `trainer=mps` on machines without CUDA. Results are logged to Weights & Biases by default (`wandb login`); pass `logger=csv` or `logger=tensorboard` to log locally instead.
 
 ## Datasets
 
-OGBench includes six curated omics datasets for graph-based classification. All are stored on Hugging Face Hub at [`geometric-intelligence/omicsgbench`](https://huggingface.co/datasets/geometric-intelligence/omicsgbench) in Parquet format and downloaded automatically on first use.
+OmicsGBench includes six curated omics datasets for graph-based classification. All are stored on Hugging Face Hub at [`geometric-intelligence/omicsgbench`](https://huggingface.co/datasets/geometric-intelligence/omicsgbench) in Parquet format and downloaded automatically on first use.
 
-| Dataset          | Domain                                  | Samples | Features                           | Classes | Task                          |
-| ---------------- | --------------------------------------- | ------- | ---------------------------------- | ------- | ----------------------------- |
-| **MotrPac**      | Proteomics (exercise response)          | 654     | ~4,976 proteins                    | 2       | Responder vs non-responder    |
-| **Parkinson's**  | Gene expression (PD study)              | 535     | ~21,755 genes                      | 2       | Dementia vs MCI/normal        |
-| **AddNeuroMed**  | Gene expression (AD study)              | 711     | ~17,197 genes                      | 3       | AD vs MCI vs Control          |
-| **BRCA**         | Gene expression (breast cancer)         | 640     | ~19,049 genes                      | 4       | Cancer subtype classification |
-| **Tuberculosis** | Protein microarray (GSE19433, sera)     | 561     | ~3,814 proteins                    | 2       | Culture negative vs positive  |
-| **Smoking**      | DNA methylation (GSE50660, blood, 450k) | 464     | 139,125 TSS probes → ~20,763 genes | 2       | Never- vs ever-smoker         |
+| Dataset          | Domain                                         | Samples | Features                           | Classes | Task                                 |
+| ---------------- | ---------------------------------------------- | ------- | ---------------------------------- | ------- | ------------------------------------ |
+| **MotrPac**      | Proteomics (HERITAGE, exercise response)       | 654     | ~4,976 proteins                    | 2       | Responder vs non-responder           |
+| **Parkinson's**  | Gene expression (GSE99039, blood)              | 535     | ~21,755 genes                      | 2       | Dementia vs MCI/normal               |
+| **AddNeuroMed**  | Gene expression (GSE63063, blood)              | 711     | ~17,197 genes                      | 3       | AD vs MCI vs Control                 |
+| **BRCA**         | DNA methylation (TCGA via MLOmics, gene-level) | 640     | ~19,049 genes                      | 4       | PAM50 subtype (LumA/LumB/Her2/Basal) |
+| **Tuberculosis** | Protein microarray (GSE19433, sera)            | 561     | ~3,814 proteins                    | 2       | Culture negative vs positive         |
+| **Smoking**      | DNA methylation (GSE50660, blood, 450k)        | 464     | 139,125 TSS probes → ~20,763 genes | 2       | Never- vs ever-smoker                |
 
-### Downloading and Processing Datasets
+### Rebuilding the Hub datasets (maintainers)
+
+You don't need this to use the benchmark: the loaders download the processed Parquet files from the Hub on first use. [`scripts/download_datasets.py`](scripts/download_datasets.py) rebuilds them from the raw sources (GEO, the MoTrPAC Data Hub, and MLOmics for BRCA) and uploads the results to `geometric-intelligence/omicsgbench`, so it needs a Hugging Face token with write access (`huggingface-cli login`):
 
 ```bash
 python scripts/download_datasets.py motrpac
 python scripts/download_datasets.py parkinsons
 python scripts/download_datasets.py addneuromed
+python scripts/download_datasets.py brca
 python scripts/download_datasets.py tuberculosis
 python scripts/download_datasets.py smoking
 python scripts/download_datasets.py all
@@ -75,10 +92,10 @@ MoTrPAC covariate adjustment, AddNeuroMed ComBat, and smoking promoter-probe pic
 
 ```bash
 # One fold: test fold 0, validation fold 1
-python -m ogbench dataset=brca model=gcn dataset.split_params.data_seed=0
+python -m omicsgbench dataset=brca model=gcn dataset.split_params.data_seed=0
 
 # Full 5-fold rotation
-python -m ogbench dataset=brca model=gcn dataset.split_params.data_seed=0,1,2,3,4 -m
+python -m omicsgbench dataset=brca model=gcn dataset.split_params.data_seed=0,1,2,3,4 -m
 ```
 
 #### Fixed split
@@ -86,9 +103,9 @@ python -m ogbench dataset=brca model=gcn dataset.split_params.data_seed=0,1,2,3,
 The single 70 / 15 / 15 split is still available. Datasets that group folds by batch need `grouping=null` for it:
 
 ```bash
-python -m ogbench dataset=motrpac model=gcn dataset.split_params.split_type=fixed
-python -m ogbench dataset=parkinsons model=gcn dataset.split_params.split_type=fixed dataset.split_params.grouping=null
-python -m ogbench dataset=tuberculosis model=gcn dataset.split_params.split_type=fixed dataset.split_params.grouping=null
+python -m omicsgbench dataset=motrpac model=gcn dataset.split_params.split_type=fixed
+python -m omicsgbench dataset=parkinsons model=gcn dataset.split_params.split_type=fixed dataset.split_params.grouping=null
+python -m omicsgbench dataset=tuberculosis model=gcn dataset.split_params.split_type=fixed dataset.split_params.grouping=null
 ```
 
 ## Graph Construction
@@ -102,13 +119,13 @@ Node (feature) selection methods: `variance`, `correlation`, `distance_correlati
 
 ```bash
 # Switch adjacency method
-python ogbench/run.py dataset=motrpac dataset.loader.parameters.adjacency_method=string dataset.split_params.data_seed=0,1,2,3,4 -m
+python omicsgbench/run.py dataset=motrpac dataset.loader.parameters.adjacency_method=string dataset.split_params.data_seed=0,1,2,3,4 -m
 
 # Change node selection
-python ogbench/run.py dataset=motrpac dataset.loader.parameters.method=distance_correlation dataset.split_params.data_seed=0,1,2,3,4 -m
+python omicsgbench/run.py dataset=motrpac dataset.loader.parameters.method=distance_correlation dataset.split_params.data_seed=0,1,2,3,4 -m
 
 # Adjust sampling ratio
-python ogbench/run.py dataset=motrpac dataset.loader.parameters.node_sample_ratio=0.3 dataset.split_params.data_seed=0,1,2,3,4 -m
+python omicsgbench/run.py dataset=motrpac dataset.loader.parameters.node_sample_ratio=0.3 dataset.split_params.data_seed=0,1,2,3,4 -m
 ```
 
 ## Usage
@@ -119,16 +136,16 @@ Each command trains on one fold (`data_seed`, default 0). The examples sweep all
 
 ```bash
 # Train GATv2 on MotrPac (default: WGCNA, variance selection, GPU)
-python ogbench/run.py dataset=motrpac model=gatv2 dataset.split_params.data_seed=0,1,2,3,4 -m
+python omicsgbench/run.py dataset=motrpac model=gatv2 dataset.split_params.data_seed=0,1,2,3,4 -m
 
 # Train GCN on Parkinson's with specific selection method
-python ogbench/run.py dataset=parkinsons model=gcn dataset.loader.parameters.method=correlation dataset.split_params.data_seed=0,1,2,3,4 -m
+python omicsgbench/run.py dataset=parkinsons model=gcn dataset.loader.parameters.method=correlation dataset.split_params.data_seed=0,1,2,3,4 -m
 
 # Train GPS on BRCA with STRING adjacency
-python ogbench/run.py dataset=brca model=gps dataset.loader.parameters.adjacency_method=string dataset.split_params.data_seed=0,1,2,3,4 -m
+python omicsgbench/run.py dataset=brca model=gps dataset.loader.parameters.adjacency_method=string dataset.split_params.data_seed=0,1,2,3,4 -m
 
 # Distributed training on one fold
-python ogbench/run.py dataset=addneuromed model=graph_sage trainer=ddp dataset.split_params.data_seed=0
+python omicsgbench/run.py dataset=addneuromed model=graph_sage trainer=ddp dataset.split_params.data_seed=0
 ```
 
 ### Available Models
@@ -147,7 +164,7 @@ python ogbench/run.py dataset=addneuromed model=graph_sage trainer=ddp dataset.s
 
 ### Configuration
 
-OGBench uses [Hydra](https://hydra.cc/) for configuration management. Key config groups:
+OmicsGBench uses [Hydra](https://hydra.cc/) for configuration management. Key config groups:
 
 - `configs/dataset/` — dataset-specific settings (features, classes, splits, baselines)
 - `configs/gene_identity/` — optional learnable node identity before message passing
@@ -161,7 +178,7 @@ OGBench uses [Hydra](https://hydra.cc/) for configuration management. Key config
 Override any parameter from the command line:
 
 ```bash
-python ogbench/run.py dataset=brca model=gin \
+python omicsgbench/run.py dataset=brca model=gin \
     optimizer.parameters.lr=0.001 \
     trainer.max_epochs=200 \
     seed=123 \
@@ -197,7 +214,7 @@ python scripts/optuna_search.py \
     --datasets motrpac brca \
     --gpus 0 1 \
     --jobs-per-gpu 1 \
-    --root-dir /path/to/ogbench-project \
+    --root-dir /path/to/omicsgbench-project \
     --output-dir /path/to/search-results \
     --storage sqlite:////path/to/search-results/studies.db
 ```
@@ -222,7 +239,7 @@ gene or marker each row represents. Append a trainable embedding for every node
 before the feature encoder and message-passing layers:
 
 ```bash
-python -m ogbench dataset=brca model=gcn gene_identity=learnable dataset.split_params.data_seed=0,1,2,3,4 -m
+python -m omicsgbench dataset=brca model=gcn gene_identity=learnable dataset.split_params.data_seed=0,1,2,3,4 -m
 ```
 
 The default `combine=concat` appends 32 identity channels and updates the
@@ -242,7 +259,7 @@ With `split_type=k-fold`, every grid configuration is scored on the validation f
 
 ```bash
 # Standard baselines on one fold of one dataset
-python ogbench/baseline.py dataset=motrpac baseline_filter=standard dataset.split_params.data_seed=0
+python omicsgbench/baseline.py dataset=motrpac baseline_filter=standard dataset.split_params.data_seed=0
 
 # All datasets, folds, node ratios and selection methods
 bash run_baselines.sh
@@ -285,7 +302,7 @@ in `best_trials.csv` as `time_budget_hit_folds`) also stop at an epoch that depe
 
 ## Leaderboard & Dataset Explorer
 
-An interactive webapp provides a leaderboard comparing all models and a dataset explorer for visualizing graph statistics across parameter combinations. See [webapp/README.md](webapp/README.md) for setup and deployment details.
+The leaderboard comparing all models and the dataset explorer for graph statistics across parameter combinations are at [omicsgbench.github.io](https://omicsgbench.github.io). The site's source is in [`webapp/`](webapp/); see [webapp/README.md](webapp/README.md) for setup and deployment details.
 
 ## Development
 
@@ -311,8 +328,8 @@ pytest tests/nn/ -v  # specific module
 ### Project Structure
 
 ```
-ogbench/
-├── ogbench/                    # Main Python package
+OmicsGBench/
+├── omicsgbench/                # Main Python package
 │   ├── run.py                  # Training entry point
 │   ├── baseline.py             # Sklearn baseline experiments
 │   ├── callbacks/              # Lightning callbacks (time budget)
@@ -337,16 +354,35 @@ ogbench/
 ├── tests/                      # Pytest suite
 ├── webapp/                     # Astro/React leaderboard & explorer
 ├── tutorials/                  # Notebooks and analysis scripts
-└── notebooks/                  # Dataset exploration notebooks
+├── notebooks/                  # Dataset exploration notebooks
+└── croissant_omicsgbench.json  # Croissant (MLCommons) dataset metadata with RAI fields
+```
+
+## Citation
+
+If you use OmicsGBench, please cite:
+
+```bibtex
+@inproceedings{cornelis2026omicsgbench,
+  title         = {OmicsGBench: A Framework for Evaluating Graph Neural Networks on Omics Data},
+  author        = {Cornelis, Louisa and Mathe, Johan and Van Langendonck, Louis and Bern{\'a}rdez, Guillermo and Miolane, Nina},
+  booktitle     = {Advances in Neural Information Processing Systems (NeurIPS), Datasets and Benchmarks Track},
+  year          = {2026},
+  eprint        = {2605.15511},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.LG},
+  url           = {https://arxiv.org/abs/2605.15511}
+}
 ```
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). The datasets on the Hub are released under CC BY 4.0.
 
 ## Acknowledgments
 
+- [TopoBench](https://github.com/geometric-intelligence/TopoBench), whose configuration-driven architecture OmicsGBench adapts
 - [PyTorch Geometric](https://pyg.org/) and [Lightning](https://lightning.ai/) for the training stack
 - [TopoModelX](https://github.com/pyt-team/TopoModelX) / [TopoNetX](https://github.com/pyt-team/TopoNetX) for topological operations
-- Datasets sourced from public repositories (GEO, MoTrPAC, TCGA)
+- Datasets sourced from public repositories (GEO, the MoTrPAC Data Hub, and TCGA via [MLOmics](https://huggingface.co/datasets/AIBIC/MLOmics))
 - [Hugging Face Hub](https://huggingface.co/) for dataset storage and distribution

@@ -3,8 +3,8 @@
 import torch
 from torch_geometric.data import Data
 
-from ogbench.transforms.data_manipulations import CalculateSimplicialCurvature
-from ogbench.transforms.liftings.graph2simplicial import SimplicialCliqueLifting
+from omicsgbench.transforms.data_manipulations import CalculateSimplicialCurvature
+from omicsgbench.transforms.liftings.graph2simplicial import SimplicialCliqueLifting
 
 
 class TestSimplicialCurvature:

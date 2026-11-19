@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from ogbench.data.selectors import RandomSelector, get_selector, selection_seed
+from omicsgbench.data.selectors import RandomSelector, get_selector, selection_seed
 
 
 def test_selection_seed_is_stable_and_distinguishes_folds_and_ratios() -> None:
