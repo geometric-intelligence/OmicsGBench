@@ -18,6 +18,7 @@ Usage examples:
 import csv
 import itertools
 import json
+import math
 import os
 import os.path as osp
 import shutil
@@ -143,6 +144,10 @@ def _compute_lcc_metrics(largest_cc_graph: nx.Graph) -> dict[str, float]:
             'diameter': float('nan'),
             'modularity': 0.0,
         }
+
+    if largest_cc_graph.number_of_edges() == 0:
+        # NetworkX < 3.7 divides by zero computing modularity on an edgeless graph.
+        return {'clustering_coefficient': 0.0, 'diameter': 0.0, 'modularity': 0.0}
 
     clustering_coefficient = nx.approximation.average_clustering(
         largest_cc_graph, trials=10_000, seed=0
@@ -424,10 +429,14 @@ def save_stats_to_json_for_webapp(all_stats: list[dict[str, Any]], output_file: 
             f'{stats["dataset"]}|{stats["node_sample_ratio"]}|{stats["method"]}|'
             f'{stats["adj_thresh"]}|{stats.get("adjacency_method", "")}'
         )
-        result[key] = stats
+        # Browsers reject NaN in JSON, and homophily is undefined on edgeless graphs.
+        result[key] = {
+            k: None if isinstance(v, float) and not math.isfinite(v) else v
+            for k, v in stats.items()
+        }
 
     with open(output_file, 'w') as f:
-        json.dump(result, f, indent=2)
+        json.dump(result, f, indent=2, allow_nan=False)
 
     print(f'Webapp JSON saved to {output_file}')
 

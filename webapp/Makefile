@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help dev build preview stats lint clean install deps deploy
+.PHONY: help dev build preview stats results lint clean install deps deploy
 
 PROJECT ?= omicsgbench
 DIST_DIR ?= dist
@@ -13,7 +13,8 @@ help:
 	@echo "  dev      - Start development server"
 	@echo "  build    - Build for production from the committed public/data/*.json"
 	@echo "  preview  - Preview production build"
-	@echo "  stats    - Regenerate public/data/stats.json from the stats CSVs (review the diff before committing)"
+	@echo "  stats    - Install a stats.json from dataset_stats_analysis.py: make stats STATS=/path/to/stats.json"
+	@echo "  results  - Build results.json from the aggregated CSVs (needs pandas): make results GNN_CSV=... BASELINE_CSV=..."
 	@echo "  lint     - Typecheck (astro check)"
 	@echo "  clean    - Clean build artifacts"
 	@echo "  install  - Install dependencies"
@@ -28,9 +29,13 @@ dev: build
 	$(NPM) run dev
 
 stats:
-	$(PYTHON) scripts/build_stats_from_csv.py
+	@test -n "$(STATS)" || { echo "usage: make stats STATS=/path/to/stats.json"; exit 1; }
+	$(PYTHON) scripts/import_stats.py "$(STATS)"
 
-# The stats CSVs are not all in the repo (BRCA WGCNA is missing), so build never regenerates stats.json.
+results:
+	@test -n "$(GNN_CSV)" -a -n "$(BASELINE_CSV)" || { echo "usage: make results GNN_CSV=... BASELINE_CSV=..."; exit 1; }
+	$(PYTHON) scripts/transform_csv_to_json.py --gnn-csv "$(GNN_CSV)" --baseline-csv "$(BASELINE_CSV)"
+
 build:
 	$(NPM) run build
 
