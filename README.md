@@ -355,7 +355,7 @@ OmicsGBench/
 ├── webapp/                     # Astro/React leaderboard & explorer
 ├── tutorials/                  # Notebooks and analysis scripts
 ├── notebooks/                  # Dataset exploration notebooks
-└── croissant_omicsgbench.json  # Croissant (MLCommons) dataset metadata with RAI fields
+└── croissant_omicsgbench.json  # Croissant 1.1 metadata (RAI + provenance); files/records from scripts/build_croissant.py
 ```
 
 ## Citation
