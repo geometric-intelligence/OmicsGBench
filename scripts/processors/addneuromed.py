@@ -189,7 +189,7 @@ def process_addneuromed(output_dir: str = 'temp_data') -> None:
         target_stats=target_stats,
         preprocessing_notes=(
             'Platforms GPL10558 and GPL6947 are concatenated without ComBat at ingest. '
-            'ogbench fits ComBat on the training split only and applies frozen batch '
+            'omicsgbench fits ComBat on the training split only and applies frozen batch '
             'location/scale to val/test. Labels are not used as ComBat covariates.'
         ),
     )

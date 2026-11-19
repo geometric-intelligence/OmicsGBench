@@ -1,0 +1,1249 @@
+{
+  "@context": {
+    "@language": "en",
+    "@vocab": "https://schema.org/",
+    "arrayShape": "cr:arrayShape",
+    "citeAs": "cr:citeAs",
+    "column": "cr:column",
+    "conformsTo": "dct:conformsTo",
+    "containedIn": "cr:containedIn",
+    "cr": "http://mlcommons.org/croissant/",
+    "data": {
+      "@id": "cr:data",
+      "@type": "@json"
+    },
+    "dataBiases": "cr:dataBiases",
+    "dataCollection": "cr:dataCollection",
+    "dataType": {
+      "@id": "cr:dataType",
+      "@type": "@vocab"
+    },
+    "dct": "http://purl.org/dc/terms/",
+    "equivalentProperty": "cr:equivalentProperty",
+    "examples": {
+      "@id": "cr:examples",
+      "@type": "@json"
+    },
+    "extract": "cr:extract",
+    "field": "cr:field",
+    "fileProperty": "cr:fileProperty",
+    "fileObject": "cr:fileObject",
+    "fileSet": "cr:fileSet",
+    "format": "cr:format",
+    "includes": "cr:includes",
+    "isArray": "cr:isArray",
+    "isLiveDataset": "cr:isLiveDataset",
+    "jsonPath": "cr:jsonPath",
+    "key": "cr:key",
+    "md5": "cr:md5",
+    "parentField": "cr:parentField",
+    "path": "cr:path",
+    "personalSensitiveInformation": "cr:personalSensitiveInformation",
+    "recordSet": "cr:recordSet",
+    "references": "cr:references",
+    "regex": "cr:regex",
+    "repeated": "cr:repeated",
+    "replace": "cr:replace",
+    "samplingRate": "cr:samplingRate",
+    "sc": "https://schema.org/",
+    "separator": "cr:separator",
+    "source": "cr:source",
+    "subField": "cr:subField",
+    "transform": "cr:transform",
+    "rai": "http://mlcommons.org/croissant/RAI/",
+    "prov": "http://www.w3.org/ns/prov#"
+  },
+  "@type": "sc:Dataset",
+  "distribution": [
+    {
+      "@type": "cr:FileObject",
+      "@id": "motrpac_data.parquet",
+      "name": "motrpac_data.parquet",
+      "description": "HERITAGE plasma proteomics (SomaScan, log2 RFU): 654 samples x 4976 Float64 features, one column per feature named by its SomaScan analyte ids. Rows are aligned with motrpac_targets.parquet. Uncorrected: the loader fits covariate adjustment for age, sex, BMI, and race on the training split of each fold.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/motrpac_data.parquet",
+      "contentSize": "31155917 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "47cb0609f8d1c4976404f4b35c748b370e5e2febc4d0f6e34ec8e69892357ae0"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "motrpac_targets.parquet",
+      "name": "motrpac_targets.parquet",
+      "description": "Class label per sample of motrpac_data.parquet.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/motrpac_targets.parquet",
+      "contentSize": "1743 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "72d2672ad82a852df0efe1fa164a7219c45addf073ca84114cc111875e4e386d"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "motrpac_map.parquet",
+      "name": "motrpac_map.parquet",
+      "description": "Graph node id to STRING lookup id for each feature.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/motrpac_map.parquet",
+      "contentSize": "69747 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "4f6d9177e8ebd7709f5bb2a4e4f10f0e1c3aeba3403c68bee64993dfc667ae60"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "motrpac_metadata.json",
+      "name": "motrpac_metadata.json",
+      "description": "Source URLs, download time, class mapping, and preprocessing notes.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/motrpac_metadata.json",
+      "contentSize": "854 B",
+      "encodingFormat": "application/json",
+      "sha256": "59469ae0398ff4d9ae47b50190b6c114c2a8c0c3d7fbaec7b3866e0c3b145832"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "motrpac_covariates.parquet",
+      "name": "motrpac_covariates.parquet",
+      "description": "Baseline covariates per sample. Covariate adjustment (age, sex, BMI, race) is fit on the training split of each fold.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/motrpac_covariates.parquet",
+      "contentSize": "18064 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "ee045a4dcfa2eca2b3672d2f2c457c3c127a734cfe429ac9032ef5167333db65"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "motrpac_targets_vo2_rel.parquet",
+      "name": "motrpac_targets_vo2_rel.parquet",
+      "description": "Relative VO2max change after training (continuous).",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/motrpac_targets_vo2_rel.parquet",
+      "contentSize": "7646 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "83bf10b9a513d54e83e69fc1089161b968f61206708fdc31fe7fc8f608aee613"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "addneuromed_data.parquet",
+      "name": "addneuromed_data.parquet",
+      "description": "AddNeuroMed whole-blood gene expression (GSE63063, Illumina GPL6947 + GPL10558): 711 samples x 17197 Float64 features, one column per feature named by its Entrez Gene ids. Rows are aligned with addneuromed_targets.parquet. Uncorrected: the loader fits ComBat across the two platforms on the training split of each fold.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/addneuromed_data.parquet",
+      "contentSize": "121327103 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "1b8e5ae1af781476c20496d19ccca9292cdfa7d576cea8162930af0a1914564c"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "addneuromed_targets.parquet",
+      "name": "addneuromed_targets.parquet",
+      "description": "Class label per sample of addneuromed_data.parquet.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/addneuromed_targets.parquet",
+      "contentSize": "1742 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "6d40aac2633b1fba90535b9d8e36be86cd1ddd8e0e753776b12cfc263573a389"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "addneuromed_map.parquet",
+      "name": "addneuromed_map.parquet",
+      "description": "Graph node id to STRING lookup id for each feature.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/addneuromed_map.parquet",
+      "contentSize": "254802 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "5d87b92826287a5847889b3627fd053ae05f0c3441861b8528d8e38aff45eb96"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "addneuromed_metadata.json",
+      "name": "addneuromed_metadata.json",
+      "description": "Source URLs, download time, class mapping, and preprocessing notes.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/addneuromed_metadata.json",
+      "contentSize": "888 B",
+      "encodingFormat": "application/json",
+      "sha256": "54937b4e2e8e634ed0d0cdbb8033fed5ea5c91d0cb2f352057b8bab7899eaa84"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "addneuromed_batches.parquet",
+      "name": "addneuromed_batches.parquet",
+      "description": "Microarray platform per sample, the ComBat batch (fit on the training split of each fold).",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/addneuromed_batches.parquet",
+      "contentSize": "1179 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "a568142f6d5a8eba8c0154052d4cee8e1bebd224259bb749f1d28484f1cc497e"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "parkinsons_data.parquet",
+      "name": "parkinsons_data.parquet",
+      "description": "Parkinson's disease whole-blood gene expression (GSE99039, Affymetrix GPL570): 535 samples x 21755 Float64 features, one column per feature named by its HGNC gene symbols. Rows are aligned with parkinsons_targets.parquet.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/parkinsons_data.parquet",
+      "contentSize": "81902804 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "ba7fd8593d16b7d095523c91491840461e8afce965b29234175179e1f7442bfa"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "parkinsons_targets.parquet",
+      "name": "parkinsons_targets.parquet",
+      "description": "Class label per sample of parkinsons_data.parquet.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/parkinsons_targets.parquet",
+      "contentSize": "1742 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "c616d80c421166ddc696a00a3027960f8d58a883d4ddd5816db166ee7a8135a0"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "parkinsons_map.parquet",
+      "name": "parkinsons_map.parquet",
+      "description": "Graph node id to STRING lookup id for each feature.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/parkinsons_map.parquet",
+      "contentSize": "313420 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "1b5344cd4a3999122e3ffdbb603f65a3a2599b22db8df355b975a64a85a7ed30"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "parkinsons_metadata.json",
+      "name": "parkinsons_metadata.json",
+      "description": "Source URLs, download time, class mapping, and preprocessing notes.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/parkinsons_metadata.json",
+      "contentSize": "900 B",
+      "encodingFormat": "application/json",
+      "sha256": "fe319457797f68f86db64363e1ca711010d4ea9df82f3ea636a8fbda9329eea6"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "parkinsons_sample_meta.parquet",
+      "name": "parkinsons_sample_meta.parquet",
+      "description": "GEO sample characteristics per sample (clinical scores, sex, age).",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/parkinsons_sample_meta.parquet",
+      "contentSize": "17807 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "05de5ad890e5be2ea600160cc497123e66a3f290578a8fd65005020a6ca56a5a"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "brca_data.parquet",
+      "name": "brca_data.parquet",
+      "description": "TCGA-BRCA tumour DNA methylation, gene level (via AIBIC/MLOmics): 640 samples x 19049 Float64 features, one column per feature named by its HGNC gene symbols. Rows are aligned with brca_targets.parquet.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/brca_data.parquet",
+      "contentSize": "123378126 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "1978f88672b8dd5625b8cba6da2e89aa7c2c0e166972fa53594ae057ce467790"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "brca_targets.parquet",
+      "name": "brca_targets.parquet",
+      "description": "Class label per sample of brca_data.parquet.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/brca_targets.parquet",
+      "contentSize": "1825 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "2a7521cc64f43ff1e53fa647e4fba921c3bd490fecfb2fc1ea71fcd66c8bbc5a"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "brca_map.parquet",
+      "name": "brca_map.parquet",
+      "description": "Graph node id to STRING lookup id for each feature.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/brca_map.parquet",
+      "contentSize": "272240 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "b9c1583c2baa0c279570e9b673d2a21b19aac22d11a0f7d73e5c6f4ac118cfc8"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "brca_metadata.json",
+      "name": "brca_metadata.json",
+      "description": "Source URLs, download time, class mapping, and preprocessing notes.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/brca_metadata.json",
+      "contentSize": "744 B",
+      "encodingFormat": "application/json",
+      "sha256": "c190511e6bb1b24d47b08e70a8f32915167f7f49fa1b870b53fc9b7cefa22a77"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "tuberculosis_data.parquet",
+      "name": "tuberculosis_data.parquet",
+      "description": "Serum antibody reactivity to the M. tuberculosis proteome (GSE19433, GPL9790): 561 samples x 3814 Float64 features, one column per feature named by its M. tuberculosis H37Rv locus tags. Rows are aligned with tuberculosis_targets.parquet.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/tuberculosis_data.parquet",
+      "contentSize": "20876569 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "b3b8dd61cc5f0c416834b47b1e714352c4fddc2c2b432ad5cab64a04e323c764"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "tuberculosis_targets.parquet",
+      "name": "tuberculosis_targets.parquet",
+      "description": "Class label per sample of tuberculosis_data.parquet.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/tuberculosis_targets.parquet",
+      "contentSize": "1727 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "47df9d58ad794a3a0766bea34ee15997b194a39bf3a532cda63fe325c3b36170"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "tuberculosis_map.parquet",
+      "name": "tuberculosis_map.parquet",
+      "description": "Graph node id to STRING lookup id for each feature.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/tuberculosis_map.parquet",
+      "contentSize": "49091 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "ea1da700d2a9fe7ea82f1db24ce1537c7b58655c504f275966742ab175bb36bc"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "tuberculosis_metadata.json",
+      "name": "tuberculosis_metadata.json",
+      "description": "Source URLs, download time, class mapping, and preprocessing notes.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/tuberculosis_metadata.json",
+      "contentSize": "1501 B",
+      "encodingFormat": "application/json",
+      "sha256": "4ed964b39c5f793a57905e65906c93b9ea95b70239b28c53dd92a5d87a77c984"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "tuberculosis_batches.parquet",
+      "name": "tuberculosis_batches.parquet",
+      "description": "Country of serum collection per sample. k-fold splits keep each country in one split.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/tuberculosis_batches.parquet",
+      "contentSize": "1561 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "135d25b32d551d9b4cc3936c03e6c0455aa151b4d3cc40433f212a156150799f"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "smoking_data.parquet",
+      "name": "smoking_data.parquet",
+      "description": "Whole-blood promoter DNA methylation (GSE50660, Illumina 450k beta values): 464 samples x 139125 Float64 features, one column per feature named by its Illumina CpG probe ids in TSS1500/TSS200. Rows are aligned with smoking_targets.parquet. Uncorrected: the loader fits per-gene selection of the probe with the lowest mean beta in never-smokers, then median centering on the training split of each fold.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/smoking_data.parquet",
+      "contentSize": "644300514 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "ac4f88429f589220cd8680a608455364f8d832dc140434e7e8baa991fc97d044"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "smoking_targets.parquet",
+      "name": "smoking_targets.parquet",
+      "description": "Class label per sample of smoking_data.parquet.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/smoking_targets.parquet",
+      "contentSize": "1725 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "38d0c1e08130742ed933869e53cfa93ed996c92cc544a22252a9efe7dfdd8cd0"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "smoking_map.parquet",
+      "name": "smoking_map.parquet",
+      "description": "Graph node id to STRING lookup id for each feature.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/smoking_map.parquet",
+      "contentSize": "343088 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "c22f20c07de1def06bc48e747eaa9291f22b62cbd6b217a6ba8689839177a0bc"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "smoking_metadata.json",
+      "name": "smoking_metadata.json",
+      "description": "Source URLs, download time, class mapping, and preprocessing notes.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/smoking_metadata.json",
+      "contentSize": "1446 B",
+      "encodingFormat": "application/json",
+      "sha256": "25d64ed3d998449c35b3f33306310c9565ae8afc2eb382ca8360447f8defa6cb"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "smoking_probe_map.parquet",
+      "name": "smoking_probe_map.parquet",
+      "description": "Promoter CpG probe (column of smoking_data.parquet) to gene pairs; a probe annotated to several genes appears once per gene.",
+      "contentUrl": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench/resolve/893d31a6d47df9e49ed39c7b8f31d3fbb37cd711/smoking_probe_map.parquet",
+      "contentSize": "1470943 B",
+      "encodingFormat": "application/x-parquet",
+      "sha256": "0b4aa66c0668fbd002771caf43382efabf4d81e961b33e4b8c7de2eba04c5fd8"
+    }
+  ],
+  "recordSet": [
+    {
+      "@type": "cr:RecordSet",
+      "@id": "motrpac_targets",
+      "name": "motrpac_targets",
+      "description": "HERITAGE plasma proteomics (SomaScan, log2 RFU). Classes: 0 = non-responder (<=15% relative VO2max gain) (279), 1 = responder (>15%) (375).",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "motrpac_targets/target",
+          "name": "target",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileObject": {
+              "@id": "motrpac_targets.parquet"
+            },
+            "extract": {
+              "column": "target"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "motrpac_map",
+      "name": "motrpac_map",
+      "description": "node_id is a graph node (SomaScan analyte ids); string_id is the identifier looked up in STRING to build the PPI graph.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "motrpac_map/node_id",
+          "name": "node_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "motrpac_map.parquet"
+            },
+            "extract": {
+              "column": "node_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "motrpac_map/string_id",
+          "name": "string_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "motrpac_map.parquet"
+            },
+            "extract": {
+              "column": "string_id"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "motrpac_covariates",
+      "name": "motrpac_covariates",
+      "description": "Baseline covariates per sample. Covariate adjustment (age, sex, BMI, race) is fit on the training split of each fold.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "motrpac_covariates/age",
+          "name": "age",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileObject": {
+              "@id": "motrpac_covariates.parquet"
+            },
+            "extract": {
+              "column": "age"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "motrpac_covariates/sex",
+          "name": "sex",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "motrpac_covariates.parquet"
+            },
+            "extract": {
+              "column": "sex"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "motrpac_covariates/bmi",
+          "name": "bmi",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileObject": {
+              "@id": "motrpac_covariates.parquet"
+            },
+            "extract": {
+              "column": "bmi"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "motrpac_covariates/race",
+          "name": "race",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "motrpac_covariates.parquet"
+            },
+            "extract": {
+              "column": "race"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "motrpac_covariates/body_fat_pct",
+          "name": "body_fat_pct",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileObject": {
+              "@id": "motrpac_covariates.parquet"
+            },
+            "extract": {
+              "column": "body_fat_pct"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "motrpac_covariates/vo2_baseline",
+          "name": "vo2_baseline",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileObject": {
+              "@id": "motrpac_covariates.parquet"
+            },
+            "extract": {
+              "column": "vo2_baseline"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "motrpac_targets_vo2_rel",
+      "name": "motrpac_targets_vo2_rel",
+      "description": "Relative VO2max change after training (continuous).",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "motrpac_targets_vo2_rel/target",
+          "name": "target",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileObject": {
+              "@id": "motrpac_targets_vo2_rel.parquet"
+            },
+            "extract": {
+              "column": "target"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "addneuromed_targets",
+      "name": "addneuromed_targets",
+      "description": "AddNeuroMed whole-blood gene expression (GSE63063, Illumina GPL6947 + GPL10558). Classes: 0 = AD (284), 1 = CTL (238), 2 = MCI (189).",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "addneuromed_targets/target",
+          "name": "target",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileObject": {
+              "@id": "addneuromed_targets.parquet"
+            },
+            "extract": {
+              "column": "target"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "addneuromed_map",
+      "name": "addneuromed_map",
+      "description": "node_id is a graph node (Entrez Gene ids); string_id is the identifier looked up in STRING to build the PPI graph.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "addneuromed_map/node_id",
+          "name": "node_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "addneuromed_map.parquet"
+            },
+            "extract": {
+              "column": "node_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "addneuromed_map/string_id",
+          "name": "string_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "addneuromed_map.parquet"
+            },
+            "extract": {
+              "column": "string_id"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "addneuromed_batches",
+      "name": "addneuromed_batches",
+      "description": "Microarray platform per sample, the ComBat batch (fit on the training split of each fold).",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "addneuromed_batches/batch",
+          "name": "batch",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "addneuromed_batches.parquet"
+            },
+            "extract": {
+              "column": "batch"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "parkinsons_targets",
+      "name": "parkinsons_targets",
+      "description": "Parkinson's disease whole-blood gene expression (GSE99039, Affymetrix GPL570). Classes: 0 = MCI/Normal (332), 1 = Dementia (203).",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_targets/target",
+          "name": "target",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_targets.parquet"
+            },
+            "extract": {
+              "column": "target"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "parkinsons_map",
+      "name": "parkinsons_map",
+      "description": "node_id is a graph node (HGNC gene symbols); string_id is the identifier looked up in STRING to build the PPI graph.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_map/node_id",
+          "name": "node_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_map.parquet"
+            },
+            "extract": {
+              "column": "node_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_map/string_id",
+          "name": "string_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_map.parquet"
+            },
+            "extract": {
+              "column": "string_id"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "parkinsons_sample_meta",
+      "name": "parkinsons_sample_meta",
+      "description": "GEO sample characteristics per sample (clinical scores, sex, age).",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/tissue",
+          "name": "tissue",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "tissue"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/subject_id",
+          "name": "subject_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "subject_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/disease_label",
+          "name": "disease label",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "disease label"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/batch",
+          "name": "batch",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "batch"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/learning_set",
+          "name": "learning set",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "learning set"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/sex",
+          "name": "sex",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "sex"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/genetic__mutated_pd_genes_",
+          "name": "genetic (mutated pd genes)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "genetic (mutated pd genes)"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/updrs_i",
+          "name": "updrs i",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "updrs i"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/updrs_ii",
+          "name": "updrs ii",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "updrs ii"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/updrs_iii_score_on",
+          "name": "updrs iii score on",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "updrs iii score on"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/updrs_iii_score_off",
+          "name": "updrs iii score off",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "updrs iii score off"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/updrs_iv",
+          "name": "updrs iv",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "updrs iv"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/hoehn___yahr__on_",
+          "name": "hoehn & yahr (on)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "hoehn & yahr (on)"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/hoehn___yahr__off_",
+          "name": "hoehn & yahr (off)",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "hoehn & yahr (off)"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/moca_score",
+          "name": "moca score",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "moca score"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/age_at_1st_symptoms",
+          "name": "age at 1st symptoms",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "age at 1st symptoms"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "parkinsons_sample_meta/age_at_exam",
+          "name": "age at exam",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "parkinsons_sample_meta.parquet"
+            },
+            "extract": {
+              "column": "age at exam"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "brca_targets",
+      "name": "brca_targets",
+      "description": "TCGA-BRCA tumour DNA methylation, gene level (via AIBIC/MLOmics). Classes: 0 = LumA (353), 1 = Her2 (42), 2 = LumB (132), 3 = Basal (113).",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "brca_targets/target",
+          "name": "target",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileObject": {
+              "@id": "brca_targets.parquet"
+            },
+            "extract": {
+              "column": "target"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "brca_map",
+      "name": "brca_map",
+      "description": "node_id is a graph node (HGNC gene symbols); string_id is the identifier looked up in STRING to build the PPI graph.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "brca_map/node_id",
+          "name": "node_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "brca_map.parquet"
+            },
+            "extract": {
+              "column": "node_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "brca_map/string_id",
+          "name": "string_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "brca_map.parquet"
+            },
+            "extract": {
+              "column": "string_id"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "tuberculosis_targets",
+      "name": "tuberculosis_targets",
+      "description": "Serum antibody reactivity to the M. tuberculosis proteome (GSE19433, GPL9790). Classes: 0 = NEG (307), 1 = POS (254).",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "tuberculosis_targets/target",
+          "name": "target",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileObject": {
+              "@id": "tuberculosis_targets.parquet"
+            },
+            "extract": {
+              "column": "target"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "tuberculosis_map",
+      "name": "tuberculosis_map",
+      "description": "node_id is a graph node (M. tuberculosis H37Rv locus tags); string_id is the identifier looked up in STRING to build the PPI graph.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "tuberculosis_map/node_id",
+          "name": "node_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "tuberculosis_map.parquet"
+            },
+            "extract": {
+              "column": "node_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "tuberculosis_map/string_id",
+          "name": "string_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "tuberculosis_map.parquet"
+            },
+            "extract": {
+              "column": "string_id"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "tuberculosis_batches",
+      "name": "tuberculosis_batches",
+      "description": "Country of serum collection per sample. k-fold splits keep each country in one split.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "tuberculosis_batches/batch",
+          "name": "batch",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "tuberculosis_batches.parquet"
+            },
+            "extract": {
+              "column": "batch"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "smoking_targets",
+      "name": "smoking_targets",
+      "description": "Whole-blood promoter DNA methylation (GSE50660, Illumina 450k beta values). Classes: 0 = never (179), 1 = ever (285).",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "smoking_targets/target",
+          "name": "target",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileObject": {
+              "@id": "smoking_targets.parquet"
+            },
+            "extract": {
+              "column": "target"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "smoking_map",
+      "name": "smoking_map",
+      "description": "node_id is a graph node (gene); string_id is the identifier looked up in STRING to build the PPI graph.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "smoking_map/node_id",
+          "name": "node_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "smoking_map.parquet"
+            },
+            "extract": {
+              "column": "node_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "smoking_map/string_id",
+          "name": "string_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "smoking_map.parquet"
+            },
+            "extract": {
+              "column": "string_id"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "smoking_probe_map",
+      "name": "smoking_probe_map",
+      "description": "Promoter CpG probe (column of smoking_data.parquet) to gene pairs; a probe annotated to several genes appears once per gene.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "smoking_probe_map/probe_id",
+          "name": "probe_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "smoking_probe_map.parquet"
+            },
+            "extract": {
+              "column": "probe_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "smoking_probe_map/gene",
+          "name": "gene",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "smoking_probe_map.parquet"
+            },
+            "extract": {
+              "column": "gene"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "conformsTo": "http://mlcommons.org/croissant/1.1",
+  "name": "omicsgbench",
+  "description": "OmicsGBench is a benchmark for graph-level prediction in the n ≪ p regime of omics data: each sample is a graph whose nodes are genes, proteins, or CpG probes, and the number of samples n is much smaller than the number of nodes p. It contains six preprocessed classification datasets: HERITAGE plasma proteomics (n = 654, p = 4,976; exercise responder vs non-responder), AddNeuroMed blood transcriptomics (711, 17,197; Alzheimer's disease vs MCI vs control), Parkinson's blood transcriptomics (535, 21,755; dementia vs MCI/normal), TCGA-BRCA tumour DNA methylation (640, 19,049; PAM50 subtype), tuberculosis serum antibody reactivity to the M. tuberculosis proteome (561, 3,814; culture-positive vs negative), and smoking blood DNA methylation (464, 139,125 promoter CpG probes over 20,763 genes; never vs ever smoker). The matrices are released uncorrected; the OmicsGBench loaders (https://github.com/geometric-intelligence/OmicsGBench) build STRING protein-protein interaction or WGCNA co-expression graphs and fit all batch, covariate, and normalisation corrections on the training split of each of five folds.",
+  "alternateName": [
+    "geometric-intelligence/omicsgbench",
+    "OmicsGBench — Omics Graph Benchmark"
+  ],
+  "creator": {
+    "@type": "Organization",
+    "name": "Geometric Intelligence Lab",
+    "url": "https://huggingface.co/geometric-intelligence"
+  },
+  "keywords": [
+    "biology",
+    "omics",
+    "genomics",
+    "transcriptomics",
+    "proteomics",
+    "DNA methylation",
+    "graph neural networks",
+    "graph classification",
+    "benchmarking",
+    "tabular-classification"
+  ],
+  "license": "https://choosealicense.com/licenses/cc-by-4.0/",
+  "url": "https://huggingface.co/datasets/geometric-intelligence/omicsgbench",
+  "rai:dataLimitations": "Every dataset has only a few hundred samples (n = 464-711), which limits statistical power and generalisability; results are reported as means and standard deviations over five folds. The data covers four measurement types (plasma proteomics, blood transcriptomics, DNA methylation of tumour and blood, and serum antibody reactivity to a pathogen proteome) from specific cohorts and platforms, so findings may not transfer to other modalities or instruments. Class imbalance is present in most datasets: HERITAGE (non-responder: 279, responder: 375), Parkinson's (MCI/Normal: 332, Dementia: 203), AddNeuroMed (AD: 284, CTL: 238, MCI: 189), BRCA (LumA: 353, LumB: 132, Her2: 42, Basal: 113), Tuberculosis (culture negative: 307, positive: 254), Smoking (never: 179, ever: 285); BRCA in particular has a severe imbalance between LumA and Her2. Smoking's 'ever' class merges 263 former and 22 current smokers, so it mostly measures past exposure. Geographic and demographic scope is restricted to the cohorts of each source study. Not recommended for: clinical diagnosis, treatment decisions, or any deployment in a medical setting without independent clinical validation.",
+  "rai:dataBiases": "All six datasets reflect biases inherent to their source cohorts and label construction. AddNeuroMed (GSE63063): cohort is predominantly elderly and of European ancestry (recruited across UK, Greece, Sweden, and Italy), limiting generalisability to other ethnicities or age groups; labels derive from clinical diagnosis which may vary across sites; ambiguous transitional categories (e.g. 'CTL to AD', 'borderline MCI') were removed, potentially discarding informative edge cases and sharpening apparent class boundaries; residual batch effects may remain after ComBat correction across the two Illumina platforms, which the loader fits on each training fold. MoTrPAC/HERITAGE: cohort comprises sedentary adults from the HERITAGE Family Study (US and Canada), enrolled as family units — samples are therefore not fully independent due to shared genetic and environmental backgrounds; the 15% relative ΔVO₂max responder threshold is a researcher-defined dichotomisation of a continuous trait and encodes assumptions about what constitutes a clinically meaningful response; the released matrix is not adjusted, but the loader regresses out age, sex, BMI, and race (fit on each training fold), which reduces confounding but also removes any signal correlated with these variables. Parkinson's (GSE99039): cohort consists exclusively of Parkinson's disease patients, so the MoCA-derived label (≥21 = MCI/Normal, <21 = Dementia) captures cognitive impairment within PD only and does not generalise to other dementias or healthy populations; the MoCA dichotomisation threshold discards continuous score information and may misclassify borderline cases; cohort is likely predominantly of white/European ancestry, consistent with typical neurological research populations. BRCA (TCGA): TCGA cohort is over-represented by patients from major US academic cancer centers and is predominantly non-Hispanic white, which may limit PAM50 subtype prediction performance in under-represented ethnic groups; PAM50 subtype definitions were themselves developed and validated primarily in white/European women; the Normal subtype was removed during preprocessing, so the benchmark cannot evaluate generalisation to normal breast tissue; DNA methylation values carry age-related epigenetic variation (epigenetic clock effects) that may confound subtype classification; class imbalance is marked (LumA: 353, LumB: 132, Her2: 42, Basal: 113 — Her2 is ~8x less frequent than LumA). Tuberculosis (GSE19433): sera come from TB suspects seeking care for pulmonary symptoms at clinics in 11 countries (Bangladesh, Brazil, Canada, Colombia, The Gambia, Kenya, Peru, South Africa, Spain, Tanzania, Vietnam), with very unequal sample sizes per country (5 to 109) and culture positivity that differs sharply by country; a model can therefore learn country rather than disease, which is why the k-fold splits keep each country in one split; the negative class is non-TB respiratory disease rather than healthy controls; features are antibody responses to M. tuberculosis proteins, so the graphs describe the pathogen's protein network (STRING taxon 83332) rather than the host's. Smoking (GSE50660): peripheral-blood DNA from 464 individuals profiled at the Wellcome Trust Sanger Institute (UK); the GEO record does not report ancestry, and the contributing consortia are European, so ancestry is likely predominantly European; collapsing the original never/former/current status into never vs ever discards the partial reversal of methylation after cessation reported by the source study; blood methylation also varies with age, sex, and blood cell composition, none of which is adjusted for.",
+  "rai:personalSensitiveInformation": "All six datasets contain health and medical data. The following sensitive attribute categories are present: (1) Health/medical data: disease diagnosis labels (Alzheimer's disease, MCI, Parkinson's disease, breast cancer PAM50 subtype, M. tuberculosis culture result), smoking history (never vs ever smoker), cognitive and motor assessment scores (MoCA, UPDRS, Hoehn & Yahr in parkinsons_sample_meta), exercise physiology measurements (VO2max), and high-dimensional molecular profiles (gene expression, proteomics, DNA methylation, antibody reactivity) — present in all datasets. (2) Age: present as a covariate in MoTrPAC/HERITAGE and in parkinsons_sample_meta, and recorded by the source studies of the other cohorts. (3) Sex/Gender: present as an explicit covariate in MoTrPAC/HERITAGE and in parkinsons_sample_meta; BRCA is a female-only cohort by disease definition. (4) Race/Ethnicity: present as an explicit covariate in MoTrPAC/HERITAGE. (5) Body composition (BMI, body fat): present as covariates in MoTrPAC/HERITAGE. (6) Location: country of serum collection for every tuberculosis sample (tuberculosis_batches). Genome-wide DNA methylation (BRCA, Smoking) can carry information about genotype and exposures. All data was de-identified by the original data providers prior to public release. No direct PII (names, dates of birth, contact information) is present in any released file. All six source datasets (GEO GSE63063, GSE99039, GSE19433, and GSE50660, MoTrPAC HERITAGE, TCGA-BRCA) are publicly accessible without a Data Use Agreement.",
+  "rai:dataUseCases": "This benchmark is designed to measure the ability of GNN models to classify biological samples using graph-structured omics data, where graphs encode STRING protein-protein interactions or WGCNA co-expression between genes, proteins, or CpG probes. Construct validity is supported by the use of established endpoints (PAM50 subtypes, MoCA scores, VO2max response, M. tuberculosis culture, smoking status) from peer-reviewed studies. Validated use cases: benchmarking GNN architectures on omics classification tasks, evaluating graph construction methods for biological data. Not validated for: clinical decision support, drug discovery, survival prediction, or any task requiring temporal or longitudinal modelling. Fine-tuning on these datasets for downstream clinical applications is explicitly not recommended without independent validation.",
+  "rai:dataSocialImpact": "Positive: enables reproducible benchmarking of GNN methods on real biomedical data, lowering barriers to entry for ML researchers in omics. Negative risks: models trained on this benchmark may encode demographic biases from source cohorts; misapplication to clinical settings without validation could cause harm, particularly for underrepresented populations not well-represented in the source cohorts. Mitigations: datasets are released for benchmarking only with explicit guidance against clinical use; all source datasets are de-identified; use of established clinical endpoints reduces label arbitrariness.",
+  "rai:hasSyntheticData": false,
+  "prov:wasDerivedFrom": [
+    {
+      "@id": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE63063",
+      "prov:label": "AddNeuroMed (GSE63063)",
+      "sc:license": "https://www.ncbi.nlm.nih.gov/geo/info/disclaimer.html"
+    },
+    {
+      "@id": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE99039",
+      "prov:label": "Parkinson's Disease Gene Expression (GSE99039)",
+      "sc:license": "https://www.ncbi.nlm.nih.gov/geo/info/disclaimer.html"
+    },
+    {
+      "@id": "https://huggingface.co/datasets/AIBIC/MLOmics",
+      "prov:label": "MLOmics BRCA Epigenomics (AIBIC/MLOmics)",
+      "sc:license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "@id": "https://motrpac-data.org/related-studies/heritage-proteomics",
+      "prov:label": "HERITAGE Proteomics (MoTrPAC Data Hub)",
+      "sc:license": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "@id": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE19433",
+      "prov:label": "M. tuberculosis Proteome Antibody Profiling of TB Suspects (GSE19433)",
+      "sc:license": "https://www.ncbi.nlm.nih.gov/geo/info/disclaimer.html"
+    },
+    {
+      "@id": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE50660",
+      "prov:label": "Smoking Blood DNA Methylation (GSE50660)",
+      "sc:license": "https://www.ncbi.nlm.nih.gov/geo/info/disclaimer.html"
+    },
+    {
+      "@id": "https://www.uniprot.org/proteomes/UP000001584",
+      "prov:label": "UniProt M. tuberculosis H37Rv Reference Proteome (UP000001584)",
+      "sc:license": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  ],
+  "prov:wasGeneratedBy": [
+    {
+      "@type": "prov:Activity",
+      "prov:type": {
+        "@id": "https://www.wikidata.org/wiki/Q4929239"
+      },
+      "prov:label": "Source Data Collection",
+      "sc:description": "All six datasets were collected by independent research teams under their respective institutional protocols and made publicly available prior to inclusion in this benchmark. No new human data was collected for this work.\n\n- AddNeuroMed (GSE63063): Blood-derived gene expression collected as part of the AddNeuroMed consortium, a multi-site European study. Whole-blood RNA was profiled on two Illumina HumanHT-12 microarray platforms (GPL6947 and GPL10558). Raw data is publicly available on NCBI GEO (accession GSE63063); downloaded from ftp.ncbi.nlm.nih.gov.\n\n- MoTrPAC/HERITAGE: Plasma proteomics from the HERITAGE Family Study, a multi-centre exercise intervention trial conducted in the US and Canada. Participants were sedentary adults enrolled as family units and underwent a standardised 20-week aerobic exercise training programme. Proteins were measured using the SomaLogic SOMAscan aptamer-based platform (SomaLogic RFU units). VO2max was assessed by graded maximal exercise test at baseline and post-training. Data were obtained from the MoTrPAC CloudFront data portal (d1yw74buhe0ts0.cloudfront.net).\n\n- Parkinson's (GSE99039): Blood transcriptomics from a Parkinson's disease cohort. Whole-blood RNA was profiled on the Affymetrix Human Genome U133 Plus 2.0 Array (GPL570). Cognitive function was assessed using the Montreal Cognitive Assessment (MoCA). Data are publicly available on NCBI GEO (accession GSE99039); downloaded from ftp.ncbi.nlm.nih.gov.\n\n- BRCA: DNA methylation profiles from The Cancer Genome Atlas (TCGA) breast cancer cohort. Tissue samples were obtained from surgical resections at TCGA-participating medical centres. The processed dataset was accessed via the AIBIC/MLOmics repository on HuggingFace (https://huggingface.co/datasets/AIBIC/MLOmics), which mirrors the TCGA GDC public-access release (https://portal.gdc.cancer.gov).\n\n- Tuberculosis (GSE19433): Sera from 561 prospectively enrolled TB suspects seeking care for pulmonary symptoms at clinics associated with national TB control programmes in 11 countries (Kunnath-Velayudhan et al., PNAS 2010). Each serum was probed once on an M. tuberculosis full-proteome protein microarray (GPL9790, ~4,100 protein spots) to measure antibody reactivity. Data are publicly available on NCBI GEO (accession GSE19433); downloaded from ftp.ncbi.nlm.nih.gov.\n\n- Smoking (GSE50660): Peripheral-blood DNA from 464 never, former, and current smokers in an epigenome-wide association study of smoking (Tsaprouni et al., Epigenetics 2014). Bisulfite-converted DNA was hybridised to the Illumina Infinium HumanMethylation450 BeadChip (GPL13534). Data are publicly available on NCBI GEO (accession GSE50660); downloaded from ftp.ncbi.nlm.nih.gov."
+    },
+    {
+      "@type": "prov:Activity",
+      "prov:type": {
+        "@id": "https://www.wikidata.org/wiki/Q5227332"
+      },
+      "prov:label": "Source Data Preprocessing",
+      "sc:description": "All preprocessing was performed programmatically using the scripts in scripts/processors/ (Python, reproducible from source). No manual curation of individual samples was performed beyond the filtering rules described below. The released matrices are uncorrected: every step that learns from the data (ComBat, covariate adjustment, probe selection, centering, imputation, feature selection, and graph construction) is fit by the OmicsGBench loader on the training split of each of five folds and applied frozen to the validation and test splits.\n\n- AddNeuroMed: (1) Platform annotation files for GPL6947 and GPL10558 were downloaded from NCBI GEO. Gene identifiers were resolved using Entrez_Gene_ID where available in the platform file, falling back to ILMN_Gene symbol otherwise. (2) The intersection of gene identifiers across both platforms was computed; only genes present on both platforms were retained. (3) Probe-level expression was averaged to gene level per platform. (4) Samples with ambiguous or transitional clinical categories ('CTL to AD', 'MCI to CTL', 'borderline MCI', 'OTHER') were removed. (5) The two platforms were concatenated without batch correction, and the platform of each sample is released in addneuromed_batches.parquet. The loader fits ComBat on the training split only, without using labels as covariates.\n\n- MoTrPAC: (1) Analyte identifiers were reconciled against the HERITAGE SomaLogic analytes manifest. (2) Analytes with more than 10% missing values across samples were removed. (3) Remaining expression values were log2-transformed (standard for SomaLogic RFU data). (4) Baseline covariates (age, sex, BMI, race, body fat, baseline VO2max) are released in motrpac_covariates.parquet; the protein matrix is not adjusted. The loader fits a per-protein regression protein ~ age + sex + BMI + race (sex and race one-hot encoded) on the training split only and removes the fitted covariate effect from all splits. The regression uses no target labels.\n\n- Parkinson's: (1) The GPL570 annotation file was downloaded from NCBI GEO. (2) Affymetrix probe IDs were mapped to HGNC gene symbols using the 'Gene Symbol' column; probes without a gene symbol were dropped. (3) Multiple probes mapping to the same gene symbol were collapsed by mean expression. (4) Samples lacking a valid MoCA score were excluded.\n\n- BRCA: (1) The methylation matrix (probes x samples) was transposed to samples x probes. (2) Samples labelled as PAM50 'Normal' subtype (source numeric label 3) were removed to focus the task on tumour subtypes. (3) Remaining numeric PAM50 labels were remapped to a contiguous 0-indexed scheme: LumA=0, Her2=1, LumB=2, Basal=3 (source label 4 mapped to model label 3).\n\n- Tuberculosis: (1) Log-transformed raw spot intensities were taken from the GSE19433 series matrix without further normalisation. (2) Microarray spot ids were mapped to M. tuberculosis ORFs (Rv locus tags) through the GPL9790 platform table; array-specific segment and alternate spots ('-s1', '-alt') were averaged into their base locus tag. (3) Locus tags were mapped to UniProt accessions through the H37Rv reference proteome (UP000001584); spots without a UniProt accession were discarded, leaving 3,814 proteins. (4) Samples whose culture result is 'not applicable' (the healthy control sera) were removed. (5) The country of serum collection is released in tuberculosis_batches.parquet; k-fold splits keep each country in a single split.\n\n- Smoking: (1) 450k beta values were restricted to the 139,125 probes that the HumanMethylation450 v1.2 manifest annotates as TSS1500 or TSS200 (promoter), and the probe-to-gene mapping (20,763 genes) is released in smoking_probe_map.parquet. (2) For each gene, the loader keeps the probe with the lowest mean beta among training never-smokers, imputes missing values with training means, and median-centres each gene on the training split."
+    },
+    {
+      "@type": "prov:Activity",
+      "prov:type": {
+        "@id": "https://www.wikidata.org/wiki/Q109719325"
+      },
+      "prov:label": "Target Label Assignment",
+      "sc:description": "Labels were derived deterministically from clinical metadata or physiological measurements supplied by the original data providers. No additional human annotation was performed for this benchmark; there are no independent annotators and inter-annotator agreement is therefore not applicable. Labels are stored in {dataset}_targets.parquet as integer class indices.\n\n- AddNeuroMed: Multi-class clinical diagnosis (AD, MCI, CTL) as recorded in the GEO sample metadata field '!Sample_characteristics_ch1: status'. Diagnoses were made by clinicians at the recruiting sites following standard criteria (NINCDS-ADRDA for AD, Petersen criteria for MCI). Quality control was performed by the original AddNeuroMed consortium. Transitional or ambiguous diagnostic categories were excluded during preprocessing (see above). Final integer encoding follows alphabetic ordering of class names: AD=0, CTL=1, MCI=2.\n\n- MoTrPAC: Binary exercise-response label computationally derived from VO2max measurements; no human labelling step. Computed as delta_rel = (VO2max_post - VO2max_baseline) / VO2max_baseline. A participant is labelled a responder (1) if delta_rel > 0.15 (i.e. >15% relative improvement), and a non-responder (0) otherwise. VO2max was measured by a standardised graded maximal exercise test at each clinical site.\n\n- Parkinson's: Binary cognitive impairment label computationally derived from Montreal Cognitive Assessment (MoCA) scores recorded in GEO metadata; no human labelling step. Scores >=21 are classified as MCI/Normal (0); scores <21 are classified as Dementia (1).\n\n- BRCA: PAM50 molecular subtype labels as provided in the AIBIC/MLOmics source file (BRCA_label_num.csv), originally assigned by the TCGA project using an RNA-based PAM50 intrinsic subtype classifier. The Normal subtype was excluded during preprocessing. Remaining labels were remapped to: LumA=0, Her2=1, LumB=2, Basal=3. Source numeric label mapping: original {0:LumA, 1:Her2, 2:LumB, 4:Basal} → model {0, 1, 2, 3}.\n\n- Tuberculosis: Binary label from the M. tuberculosis culture result recorded in the GEO sample metadata ('m. tuberculosis culture'); no human labelling step for this benchmark. NEG = 0 (non-TB respiratory disease, 307), POS = 1 (culture-confirmed TB, 254).\n\n- Smoking: Binary label from the smoking status recorded in the GEO sample metadata (0 = never, 1 = former, 2 = current); no human labelling step for this benchmark. Former and current smokers are merged: never = 0 (179), ever = 1 (285: 263 former, 22 current)."
+    }
+  ],
+  "citeAs": "@inproceedings{cornelis2026omicsgbench,\n  title         = {OmicsGBench: A Framework for Evaluating Graph Neural Networks on Omics Data},\n  author        = {Cornelis, Louisa and Mathe, Johan and Van Langendonck, Louis and Bern{\\'a}rdez, Guillermo and Miolane, Nina},\n  booktitle     = {Advances in Neural Information Processing Systems (NeurIPS), Datasets and Benchmarks Track},\n  year          = {2026},\n  eprint        = {2605.15511},\n  archivePrefix = {arXiv},\n  primaryClass  = {cs.LG},\n  url           = {https://arxiv.org/abs/2605.15511}\n}",
+  "datePublished": "2025-05-01",
+  "dateModified": "2026-10-07",
+  "version": "1.0.0",
+  "rai:dataCollection": "Data was collected from publicly available biomedical repositories: NCBI GEO (GSE63063, GSE99039, GSE19433, GSE50660), the MoTrPAC Data Hub (HERITAGE proteomics), and TCGA via AIBIC/MLOmics on Hugging Face. Feature annotations come from the GEO platform tables, the Illumina HumanMethylation450 v1.2 manifest, and the UniProt M. tuberculosis H37Rv reference proteome (UP000001584). No new human data was collected. All source datasets are de-identified and publicly accessible."
+}

@@ -3,10 +3,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ogbench"
+name = "omicsgbench"
 dynamic = ["version"]
 readme = "README.md"
-description = "Omics Graph Benchmarking"
+description = "OmicsGBench: a framework for evaluating graph neural networks on omics data"
 license = "MIT"
 classifiers = [
     "License :: OSI Approved :: MIT License",
@@ -15,6 +15,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Mathematics",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Natural Language :: English",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -63,8 +64,9 @@ dependencies=[
     "torch-cluster",
     "pyg-lib>=0.6.0",
     "combat>=0.3.3",
-    "topomodelx @ git+https://github.com/pyt-team/TopoModelX.git",
-    "toponetx @ git+https://github.com/pyt-team/TopoNetX.git",
+    "topomodelx @ git+https://github.com/pyt-team/TopoModelX.git@1c1e1f7d442e817f47c687d4e8efcb66f75aee0f",
+    # TopoNetX requires Python >= 3.13 from commit 727e13c onwards.
+    "toponetx @ git+https://github.com/pyt-team/TopoNetX.git@d44f770d94412cc54d63964b8d4fc1a1ed287996",
     "lightning>=2.5.0",
 ]
 
@@ -92,16 +94,18 @@ test = [
     "pytest-mock"
 ]
 
-dev = ["ogbench[test, lint]"]
-all = ["ogbench[dev, doc]"]
+dev = ["omicsgbench[test, lint]"]
+all = ["omicsgbench[dev, doc]"]
 
 
 [project.scripts]
-ogbench-train = "ogbench.run:main"
+omicsgbench-train = "omicsgbench.run:main"
 
 [project.urls]
-homepage="https://geometric-intelligence.github.io/ogbench/index.html"
-repository="https://github.com/geometric-intelligence/ogbench"
+homepage="https://omicsgbench.github.io"
+repository="https://github.com/geometric-intelligence/OmicsGBench"
+paper="https://arxiv.org/abs/2605.15511"
+dataset="https://huggingface.co/datasets/geometric-intelligence/omicsgbench"
 
 [tool.ruff]
 line-length = 99
@@ -130,7 +134,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"ogbench/baseline.py" = ["I001"]
+"omicsgbench/baseline.py" = ["I001"]
 
 [tool.ruff.format]
 quote-style = "single"
@@ -139,7 +143,7 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.ruff.lint.isort]
-known-first-party = ["ogbench"]
+known-first-party = ["omicsgbench"]
 
 [tool.docformatter]
 wrap-summaries = 79
@@ -149,13 +153,13 @@ wrap-descriptions = 79
 convention = "pep257"
 
 [tool.hatch.version]
-path = "ogbench/__init__.py"
+path = "omicsgbench/__init__.py"
 
 [tool.hatch.metadata]
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["ogbench"]
+packages = ["omicsgbench"]
 
 
 [tool.mypy]

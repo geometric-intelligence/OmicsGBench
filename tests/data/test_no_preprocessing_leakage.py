@@ -16,9 +16,9 @@ import pandas as pd
 import pytest
 from omegaconf import OmegaConf
 
-import ogbench.baseline as baseline
-from ogbench.data.datasets.hf_omics import HFOmicsDataset
-from ogbench.data.utils.split_utils import compute_omics_split_indices
+import omicsgbench.baseline as baseline
+from omicsgbench.data.datasets.hf_omics import HFOmicsDataset
+from omicsgbench.data.utils.split_utils import compute_omics_split_indices
 
 N_SAMPLES, N_FEATURES, K, FOLD = 120, 260, 5, 0
 

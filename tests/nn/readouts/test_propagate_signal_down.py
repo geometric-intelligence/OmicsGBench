@@ -4,7 +4,7 @@ import pytest
 import torch
 import torch_geometric.data as tg_data
 
-from ogbench.nn.readouts.propagate_signal_down import PropagateSignalDown
+from omicsgbench.nn.readouts.propagate_signal_down import PropagateSignalDown
 
 
 class TestPropagateSignalDown:

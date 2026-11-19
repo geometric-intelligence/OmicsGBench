@@ -42,9 +42,9 @@ from optuna.trial import TrialState
 # As a script, sys.path[0] is scripts/; an editable install of another checkout must not win.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ogbench.data.utils.split_utils import SPLIT_PROTOCOL  # noqa: E402
-from ogbench.utils.config_resolvers import register_all_resolvers  # noqa: E402
-from ogbench.utils.hparam_search import (  # noqa: E402
+from omicsgbench.data.utils.split_utils import SPLIT_PROTOCOL  # noqa: E402
+from omicsgbench.utils.config_resolvers import register_all_resolvers  # noqa: E402
+from omicsgbench.utils.hparam_search import (  # noqa: E402
     OOM_ERROR_PREFIX,
     GpuDevice,
     acquire_gpu,
@@ -343,7 +343,7 @@ class OptunaSearchConfig:
             sampler_seed=int(optuna_config.get('sampler_seed', 1234)),
             n_startup_trials=int(optuna_config.get('n_startup_trials', 10)),
             storage=storage,
-            study_name_prefix=str(optuna_config.get('study_name_prefix', 'ogbench')),
+            study_name_prefix=str(optuna_config.get('study_name_prefix', 'omicsgbench')),
             heartbeat_interval=int(optuna_config.get('heartbeat_interval', 60)),
             grace_period=int(optuna_config.get('grace_period', 300)),
             max_retries=int(optuna_config.get('max_retries', 1)),

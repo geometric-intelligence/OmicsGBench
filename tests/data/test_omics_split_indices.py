@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from sklearn.utils import shuffle as sklearn_shuffle
 
-from ogbench.data.utils.split_utils import (
+from omicsgbench.data.utils.split_utils import (
     compute_omics_split_indices,
     group_kfold_is_feasible,
     omics_cache_split_suffix,
@@ -114,7 +114,7 @@ def test_cache_suffix_separates_grouped_folds():
 
 
 def test_cache_name_includes_corrections_when_set():
-    from ogbench.data.utils.split_utils import build_omics_cache_relative_name
+    from omicsgbench.data.utils.split_utils import build_omics_cache_relative_name
 
     plain = build_omics_cache_relative_name(
         'addneuromed', 0.4, 'wgcna', 'variance', 0.5, 0.7, **_CACHE_KEYS
@@ -127,7 +127,7 @@ def test_cache_name_includes_corrections_when_set():
 
 
 def test_wgcna_target_connectivity_replaces_fixed_threshold_in_cache_name():
-    from ogbench.data.utils.split_utils import build_omics_cache_relative_name
+    from omicsgbench.data.utils.split_utils import build_omics_cache_relative_name
 
     name = build_omics_cache_relative_name(
         'motrpac', 0.4, 'wgcna', 'variance', 0.5, 0.7, **_CACHE_KEYS
@@ -138,7 +138,7 @@ def test_wgcna_target_connectivity_replaces_fixed_threshold_in_cache_name():
 
 
 def test_string_keeps_threshold_in_cache_name_even_if_connectivity_is_set():
-    from ogbench.data.utils.split_utils import build_omics_cache_relative_name
+    from omicsgbench.data.utils.split_utils import build_omics_cache_relative_name
 
     name = build_omics_cache_relative_name(
         'motrpac', 0.4, 'string', 'variance', 0.5, 0.7, **_CACHE_KEYS
@@ -149,7 +149,7 @@ def test_string_keeps_threshold_in_cache_name_even_if_connectivity_is_set():
 
 
 def test_cache_name_separates_revision_imputer_and_binarization():
-    from ogbench.data.utils.split_utils import build_omics_cache_relative_name
+    from omicsgbench.data.utils.split_utils import build_omics_cache_relative_name
 
     def name(**overrides):
         keys = {**_CACHE_KEYS, **overrides}
@@ -164,7 +164,7 @@ def test_cache_name_separates_revision_imputer_and_binarization():
 
 
 def test_cache_name_requires_revision():
-    from ogbench.data.utils.split_utils import build_omics_cache_relative_name
+    from omicsgbench.data.utils.split_utils import build_omics_cache_relative_name
 
     with pytest.raises(ValueError, match='revision'):
         build_omics_cache_relative_name(

@@ -1,4 +1,4 @@
-_target_: ogbench.optimizer.TBOptimizer
+_target_: omicsgbench.optimizer.TBOptimizer
 # Full compatibility with all available torch optimizers and schedulers
 
 optimizer_id: Adam # torch id of the optimizer

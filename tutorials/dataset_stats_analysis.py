@@ -66,8 +66,8 @@ def load_dataset(
     """Load the fold-0 k-fold graph for the given parameters."""
     from omegaconf import OmegaConf
 
-    from ogbench.data.adjacency import WGCNA_BINARIZATION_FIXED_THRESHOLD
-    from ogbench.data.datasets.hf_omics import HFOmicsDataset
+    from omicsgbench.data.adjacency import WGCNA_BINARIZATION_FIXED_THRESHOLD
+    from omicsgbench.data.datasets.hf_omics import HFOmicsDataset
 
     # Pass 'full' as string, not None, because HFOmicsDataset checks for 'full' string
     ratio_value = 'full' if node_sample_ratio == 'full' else float(node_sample_ratio)

@@ -3,7 +3,7 @@
 import torch
 from torch_geometric.data import Data
 
-from ogbench.dataloader import DataloadDataset
+from omicsgbench.dataloader import DataloadDataset
 
 
 class TestDataloadDataset:

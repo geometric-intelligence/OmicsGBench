@@ -1,0 +1,88 @@
+"""Data manipulations module."""
+
+from omicsgbench.transforms.data_manipulations.calculate_simplicial_curvature import (
+    CalculateSimplicialCurvature,
+)
+from omicsgbench.transforms.data_manipulations.combined_positional_and_structural_encodings import (
+    CombinedPSEs,
+)
+from omicsgbench.transforms.data_manipulations.electrostatic_encodings import ElectrostaticPE
+from omicsgbench.transforms.data_manipulations.equal_gaus_features import EqualGausFeatures
+from omicsgbench.transforms.data_manipulations.group_homophily import (
+    GroupCombinatorialHomophily,
+)
+from omicsgbench.transforms.data_manipulations.hkdiag_encodings import HKdiagSE
+from omicsgbench.transforms.data_manipulations.identity_transform import IdentityTransform
+from omicsgbench.transforms.data_manipulations.infere_knn_connectivity import (
+    InfereKNNConnectivity,
+)
+from omicsgbench.transforms.data_manipulations.infere_radius_connectivity import (
+    InfereRadiusConnectivity,
+)
+from omicsgbench.transforms.data_manipulations.keep_only_connected_component import (
+    KeepOnlyConnectedComponent,
+)
+from omicsgbench.transforms.data_manipulations.keep_selected_data_fields import (
+    KeepSelectedDataFields,
+)
+from omicsgbench.transforms.data_manipulations.khop_precompute import KHopPrecompute
+from omicsgbench.transforms.data_manipulations.laplacian_encodings import LapPE
+from omicsgbench.transforms.data_manipulations.mp_homophily import MessagePassingHomophily
+from omicsgbench.transforms.data_manipulations.node_degrees import NodeDegrees
+from omicsgbench.transforms.data_manipulations.node_features_to_float import (
+    NodeFeaturesToFloat,
+)
+from omicsgbench.transforms.data_manipulations.one_hot_degree_features import (
+    OneHotDegreeFeatures,
+)
+from omicsgbench.transforms.data_manipulations.random_walk_encodings import RWSE
+from omicsgbench.transforms.data_manipulations.redefine_simplicial_neighbourhoods import (
+    RedefineSimplicialNeighbourhoods,
+)
+
+# Create dictionary of all data manipulations
+DATA_MANIPULATIONS: dict[str, type] = {
+    'CalculateSimplicialCurvature': CalculateSimplicialCurvature,
+    'EqualGausFeatures': EqualGausFeatures,
+    'GroupCombinatorialHomophily': GroupCombinatorialHomophily,
+    'IdentityTransform': IdentityTransform,
+    'InfereKNNConnectivity': InfereKNNConnectivity,
+    'InfereRadiusConnectivity': InfereRadiusConnectivity,
+    'KeepOnlyConnectedComponent': KeepOnlyConnectedComponent,
+    'KeepSelectedDataFields': KeepSelectedDataFields,
+    'KHopPrecompute': KHopPrecompute,
+    'MessagePassingHomophily': MessagePassingHomophily,
+    'NodeDegrees': NodeDegrees,
+    'NodeFeaturesToFloat': NodeFeaturesToFloat,
+    'OneHotDegreeFeatures': OneHotDegreeFeatures,
+    'RedefineSimplicialNeighbourhoods': RedefineSimplicialNeighbourhoods,
+    'HKdiagSE': HKdiagSE,
+    'ElectrostaticPE': ElectrostaticPE,
+    'LapPE': LapPE,
+    'RWSE': RWSE,
+    'CombinedPSEs': CombinedPSEs,
+}
+
+# Generate __all__
+__all__ = [
+    'DATA_MANIPULATIONS',
+    'CalculateSimplicialCurvature',
+    'EqualGausFeatures',
+    'GroupCombinatorialHomophily',
+    'IdentityTransform',
+    'InfereKNNConnectivity',
+    'InfereRadiusConnectivity',
+    'KeepOnlyConnectedComponent',
+    'KeepSelectedDataFields',
+    'KHopPrecompute',
+    'MessagePassingHomophily',
+    'NodeDegrees',
+    'NodeFeaturesToFloat',
+    'OneHotDegreeFeatures',
+    'RedefineSimplicialNeighbourhoods',
+    'HKdiagSE',
+    'ElectrostaticPE',
+    'LapPE',
+    'RWSE',
+    'CombinedPSEs',
+]

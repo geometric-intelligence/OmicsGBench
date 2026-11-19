@@ -4,7 +4,7 @@ Compares ``load_and_prepare_data`` against the ``selected_data.parquet`` artifac
 written by ``HFOmicsDataset.download`` for every cached fold/ratio/method cell.
 
 Usage:
-    python scripts/verify_baseline_features.py --root-dir /path/to/ogbench
+    python scripts/verify_baseline_features.py --root-dir /path/to/omicsgbench
 """
 
 import argparse
@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from hydra import compose, initialize_config_dir
 
-import ogbench.baseline as baseline
+import omicsgbench.baseline as baseline
 
 CONFIG_DIR = osp.join(osp.dirname(osp.dirname(osp.abspath(__file__))), 'configs')
 CELL_PATTERN = re.compile(

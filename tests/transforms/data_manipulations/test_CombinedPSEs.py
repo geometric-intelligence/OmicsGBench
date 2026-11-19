@@ -3,7 +3,7 @@
 import torch
 from torch_geometric.data import Data
 
-from ogbench.transforms.data_manipulations.combined_positional_and_structural_encodings import (
+from omicsgbench.transforms.data_manipulations.combined_positional_and_structural_encodings import (
     CombinedPSEs,
 )
 

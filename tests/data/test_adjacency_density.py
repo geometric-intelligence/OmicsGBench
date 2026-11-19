@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from ogbench.data.adjacency.density import (
+from omicsgbench.data.adjacency.density import (
     WGCNA_BINARIZATION_FIXED_THRESHOLD,
     binarize_to_target_connectivity,
     require_adjacency_binarization_params,

@@ -4,10 +4,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ogbench.data.corrections.center import MedianCenterer
-from ogbench.data.corrections.combat import CombatCorrector
-from ogbench.data.corrections.covariates import CovariateAdjuster
-from ogbench.data.corrections.promoter import PromoterMinBetaSelector, select_min_promoter_per_gene
+from omicsgbench.data.corrections.center import MedianCenterer
+from omicsgbench.data.corrections.combat import CombatCorrector
+from omicsgbench.data.corrections.covariates import CovariateAdjuster
+from omicsgbench.data.corrections.promoter import (
+    PromoterMinBetaSelector,
+    select_min_promoter_per_gene,
+)
 
 
 def test_covariate_adjuster_fit_does_not_use_val_rows():

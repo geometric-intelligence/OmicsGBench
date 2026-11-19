@@ -4,7 +4,7 @@ import pytest
 import torch
 from torch_geometric.data import Data
 
-from ogbench.transforms.data_manipulations import MessagePassingHomophily
+from omicsgbench.transforms.data_manipulations import MessagePassingHomophily
 
 
 class TestMessagePassingHomophily:

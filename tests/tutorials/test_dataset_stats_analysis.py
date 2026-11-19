@@ -9,7 +9,7 @@ import pytest
 import torch
 from omegaconf import OmegaConf
 
-from ogbench.data.datasets import hf_omics
+from omicsgbench.data.datasets import hf_omics
 from tutorials import dataset_stats_analysis
 
 HF_CONFIG = Path(__file__).parents[2] / 'configs' / 'hf' / 'default.yaml'

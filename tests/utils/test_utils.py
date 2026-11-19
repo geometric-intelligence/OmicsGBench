@@ -7,7 +7,7 @@ import pytest
 import torch
 from omegaconf import DictConfig
 
-from ogbench.utils.utils import extras, get_metric_value, task_wrapper
+from omicsgbench.utils.utils import extras, get_metric_value, task_wrapper
 
 # initialize(config_path="../../configs", job_name="job")
 

@@ -156,7 +156,7 @@ def process_motrpac(output_dir: str = 'temp_data') -> None:
         target_stats=target_stats,
         preprocessing_notes=(
             'Data is log2-transformed. Covariate adjustment (age, sex, bmi, race) is NOT '
-            'applied at ingest; ogbench fits protein ~ covariates on the training split only '
+            'applied at ingest; omicsgbench fits protein ~ covariates on the training split only '
             'and applies the frozen coefficients to val/test.'
         ),
     )

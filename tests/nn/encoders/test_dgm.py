@@ -4,7 +4,7 @@ import pytest
 import torch
 import torch_geometric
 
-from ogbench.nn.encoders import DGMStructureFeatureEncoder
+from omicsgbench.nn.encoders import DGMStructureFeatureEncoder
 
 
 class TestDGMStructureFeatureEncoder:

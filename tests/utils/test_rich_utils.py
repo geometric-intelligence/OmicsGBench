@@ -5,15 +5,15 @@ from unittest.mock import patch
 import pytest
 from omegaconf import DictConfig
 
-from ogbench.utils.rich_utils import enforce_tags, print_config_tree
+from omicsgbench.utils.rich_utils import enforce_tags, print_config_tree
 
 
-@patch('ogbench.utils.rich_utils.pylogger.RankedLogger.info')
-@patch('ogbench.utils.rich_utils.rich.tree.Tree')
-@patch('ogbench.utils.rich_utils.rich.syntax.Syntax')
-@patch('ogbench.utils.rich_utils.rich.print')
-@patch('ogbench.utils.rich_utils.Path.write_text')
-@patch('ogbench.utils.rich_utils.HydraConfig.get')
+@patch('omicsgbench.utils.rich_utils.pylogger.RankedLogger.info')
+@patch('omicsgbench.utils.rich_utils.rich.tree.Tree')
+@patch('omicsgbench.utils.rich_utils.rich.syntax.Syntax')
+@patch('omicsgbench.utils.rich_utils.rich.print')
+@patch('omicsgbench.utils.rich_utils.Path.write_text')
+@patch('omicsgbench.utils.rich_utils.HydraConfig.get')
 def test_print_config_tree(
     mock_hydra_config_get,
     mock_write_text,
@@ -69,11 +69,11 @@ def test_print_config_tree(
         print_config_tree(mock_cfg, save_to_file=True)
 
 
-@patch('ogbench.utils.rich_utils.HydraConfig')
-@patch('ogbench.utils.rich_utils.Prompt.ask')
-@patch('ogbench.utils.rich_utils.pylogger.RankedLogger.warning')
-@patch('ogbench.utils.rich_utils.pylogger.RankedLogger.info')
-@patch('ogbench.utils.rich_utils.rich.print')
+@patch('omicsgbench.utils.rich_utils.HydraConfig')
+@patch('omicsgbench.utils.rich_utils.Prompt.ask')
+@patch('omicsgbench.utils.rich_utils.pylogger.RankedLogger.warning')
+@patch('omicsgbench.utils.rich_utils.pylogger.RankedLogger.info')
+@patch('omicsgbench.utils.rich_utils.rich.print')
 def test_enforce_tags_no_tags(
     mock_rich_print,
     mock_info,

@@ -14,7 +14,7 @@ import pytest
 import torch
 from optuna.trial import TrialState
 
-from ogbench.utils.hparam_search import GpuDevice, acquire_gpu, is_oom_failure
+from omicsgbench.utils.hparam_search import GpuDevice, acquire_gpu, is_oom_failure
 from scripts import optuna_search
 from scripts.optuna_search import (
     ADJACENCY_METHOD,

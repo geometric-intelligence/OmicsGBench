@@ -15,9 +15,9 @@ import pytest
 from omegaconf import OmegaConf
 from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold
 
-from ogbench.data.loaders.graph import omics_datasets
-from ogbench.data.loaders.graph.omics_datasets import OmicsDatasetLoader
-from ogbench.data.preprocessor import PreProcessor
+from omicsgbench.data.loaders.graph import omics_datasets
+from omicsgbench.data.loaders.graph.omics_datasets import OmicsDatasetLoader
+from omicsgbench.data.preprocessor import PreProcessor
 
 N_SAMPLES, N_FEATURES, K = 60, 12, 5
 N_GROUPS = 12
@@ -107,7 +107,7 @@ def test_every_fold_sees_exactly_its_kfold_samples(
             raise FileNotFoundError(filename)
         return str(path)
 
-    # ogbench.data.datasets registers its modules dynamically, so patch the class the loader uses.
+    # omicsgbench.data.datasets registers its modules dynamically, so patch the class the loader uses.
     monkeypatch.setattr(omics_datasets.HFOmicsDataset, '_hf_download', local_download)
     fold_ids = _expected_fold_ids(targets, groups)
     tested: list[int] = []

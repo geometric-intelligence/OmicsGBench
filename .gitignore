@@ -187,6 +187,9 @@ addneuromed_data/
 logs/
 *.log
 
+# Optuna search output (scripts/optuna_search.py default)
+search_results/
+
 # Data
 *.npy
 *.parquet
