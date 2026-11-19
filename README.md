@@ -15,7 +15,7 @@ Paper: [OmicsGBench: A Framework for Evaluating Graph Neural Networks on Omics D
 ## Overview
 
 - **6 curated omics datasets** on Hugging Face Hub with automatic download
-- **8 GNN architectures plus an MLP baseline** — GCN, GATv2, GATv4, GIN, GraphSAGE, ChebNet, SAGN, GPS, and MLP
+- **8 GNN architectures plus an MLP baseline** — GCN, GATv2, GATv4 (MLA-GNN), GIN, GraphSAGE, ChebNet, SAGN, GPS, and MLP
 - **2 graph construction methods** — WGCNA co-expression and STRING protein-protein interaction
 - **Five-fold evaluation** with every preprocessing step fit on the training split only
 - **Optuna hyperparameter search** scored on the mean validation macro F1 across folds
@@ -150,17 +150,17 @@ python omicsgbench/run.py dataset=addneuromed model=graph_sage trainer=ddp datas
 
 ### Available Models
 
-| Model     | Config name  | Description                                           |
-| --------- | ------------ | ----------------------------------------------------- |
-| GCN       | `gcn`        | Graph Convolutional Network                           |
-| GATv2     | `gatv2`      | Graph Attention Network v2                            |
-| GATv4     | `gatv4`      | Graph Attention Network v4 (per-layer heads/channels) |
-| GIN       | `gin`        | Graph Isomorphism Network                             |
-| GraphSAGE | `graph_sage` | Graph Sample and Aggregate                            |
-| ChebNet   | `chebnet`    | Chebyshev Spectral Graph Convolution                  |
-| SAGN      | `sagn`       | Structure-Aware Graph Network                         |
-| GPS       | `gps`        | General, Powerful, Scalable Graph Transformer         |
-| MLP       | `mlp`        | Multi-layer Perceptron (non-graph baseline)           |
+| Model     | Config name  | Description                                                                                            |
+| --------- | ------------ | ------------------------------------------------------------------------------------------------------ |
+| GCN       | `gcn`        | Graph Convolutional Network                                                                            |
+| GATv2     | `gatv2`      | Graph Attention Network v2                                                                             |
+| GATv4     | `gatv4`      | Multi-level attention GNN, reported as MLA-GNN in the paper and leaderboard (per-layer heads/channels) |
+| GIN       | `gin`        | Graph Isomorphism Network                                                                              |
+| GraphSAGE | `graph_sage` | Graph Sample and Aggregate                                                                             |
+| ChebNet   | `chebnet`    | Chebyshev Spectral Graph Convolution                                                                   |
+| SAGN      | `sagn`       | Structure-Aware Graph Network                                                                          |
+| GPS       | `gps`        | General, Powerful, Scalable Graph Transformer                                                          |
+| MLP       | `mlp`        | Multi-layer Perceptron (non-graph baseline)                                                            |
 
 ### Configuration
 
