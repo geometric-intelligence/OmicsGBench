@@ -3,7 +3,7 @@
 import torch
 from torch_geometric.data import Data
 
-from ogbench.transforms.data_manipulations import IdentityTransform
+from omicsgbench.transforms.data_manipulations import IdentityTransform
 
 
 class TestIdentityTransform:

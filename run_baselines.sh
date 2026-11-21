@@ -22,7 +22,7 @@ echo "ratios=${NODE_RATIOS} methods=${METHODS}"
 echo "hparam_selection=global_kfold_mean_validation"
 echo "========================================="
 
-if "${PYTHON}" ogbench/baseline.py --multirun \
+if "${PYTHON}" omicsgbench/baseline.py --multirun \
     "dataset=${DATASETS}" \
     dataset.split_params.split_type=k-fold \
     dataset.split_params.k=5 \

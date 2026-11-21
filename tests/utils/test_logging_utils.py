@@ -4,11 +4,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ogbench.utils import log_hyperparameters
+from omicsgbench.utils import log_hyperparameters
 
 
-@patch('ogbench.utils.logging_utils.pylogger.RankedLogger.warning')
-@patch('ogbench.utils.logging_utils.OmegaConf.to_container')
+@patch('omicsgbench.utils.logging_utils.pylogger.RankedLogger.warning')
+@patch('omicsgbench.utils.logging_utils.OmegaConf.to_container')
 def test_log_hyperparameters(mock_to_container, mock_warning):
     """Test the log_hyperparameters function.
 

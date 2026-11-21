@@ -1,0 +1,1684 @@
+"""Sklearn baseline runner for omics classification tasks."""
+
+import copy
+import fcntl
+import hashlib
+import importlib
+import json
+import logging
+import os
+import os.path as osp
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import hydra
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import rootutils
+import seaborn as sns
+import wandb
+from huggingface_hub import hf_hub_download
+from omegaconf import DictConfig, OmegaConf
+from sklearn.decomposition import PCA
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import (
+    ConfusionMatrixDisplay,
+    PrecisionRecallDisplay,
+    RocCurveDisplay,
+    accuracy_score,
+    average_precision_score,
+    balanced_accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+
+from omicsgbench.data.corrections import (
+    CombatCorrector,
+    CovariateAdjuster,
+    MedianCenterer,
+    PromoterMinBetaSelector,
+)
+from omicsgbench.data.utils.split_utils import (
+    build_omics_cache_relative_name,
+    compute_omics_split_indices,
+    resolve_split_groups,
+)
+
+rootutils.setup_root(__file__, indicator='.project-root', pythonpath=True)
+
+# Set matplotlib style
+sns.set_style('whitegrid')
+plt.rcParams['figure.dpi'] = 100
+plt.rcParams['savefig.dpi'] = 300
+plt.rcParams['figure.figsize'] = (12, 8)
+
+logging.basicConfig(
+    level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+HF_REPO_ID = 'geometric-intelligence/omicsgbench'
+
+
+@dataclass
+class DatasetContainer:
+    """Container for all dataset variants at different preprocessing stages."""
+
+    # Raw data (before any preprocessing)
+    X_train_raw: np.ndarray
+    X_val_raw: np.ndarray
+    X_test_raw: np.ndarray
+    y_train: np.ndarray
+    y_val: np.ndarray
+    y_test: np.ndarray
+
+    # Processed data (after imputation but before scaling - pipeline handles scaling)
+    X_train_processed: np.ndarray
+    X_val_processed: np.ndarray
+    X_test_processed: np.ndarray
+
+    # Combined data for GridSearchCV
+    X_combined: np.ndarray
+    y_combined: np.ndarray
+
+    # Dataset metadata
+    dataset_name: str
+    n_features: int
+    n_samples: int
+    class_distribution: dict
+    class_names: list[str] | None = None
+
+    def get_features_at_stage(self, stage: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Get features at a specific preprocessing stage.
+
+        :param stage: 'raw' (before any preprocessing), 'processed' (after imputation but before
+            scaling)
+        :return: Tuple of (X_train, X_val, X_test) at the specified stage
+        """
+        if stage == 'raw':
+            return self.X_train_raw, self.X_val_raw, self.X_test_raw
+        elif stage == 'processed':
+            return self.X_train_processed, self.X_val_processed, self.X_test_processed
+        else:
+            raise ValueError(f'Unknown stage: {stage}')
+
+    def get_class_info(self) -> dict:
+        """Get class distribution information."""
+        unique_train, counts_train = np.unique(self.y_train, return_counts=True)
+        unique_val, counts_val = np.unique(self.y_val, return_counts=True)
+        unique_test, counts_test = np.unique(self.y_test, return_counts=True)
+
+        return {
+            'train': dict(zip(unique_train, counts_train, strict=True)),
+            'val': dict(zip(unique_val, counts_val, strict=True)),
+            'test': dict(zip(unique_test, counts_test, strict=True)),
+            'n_classes': len(np.unique(self.y_train)),
+            'is_binary': len(np.unique(self.y_train)) == 2,
+        }
+
+
+@dataclass(frozen=True)
+class GlobalHparamSelection:
+    """One hyperparameter choice selected by mean validation score across folds."""
+
+    best_params: dict[str, Any]
+    mean_score: float
+    fold_scores: dict[int, float]
+    candidate_mean_scores: dict[str, float]
+    cache_path: Path | None = None
+
+
+def task_wrapper(task_func):
+    """Simplified task wrapper that handles wandb cleanup."""
+
+    def wrap(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
+        try:
+            metric_dict, object_dict = task_func(cfg=cfg)
+        except Exception:
+            logger.exception('Task failed with exception')
+            # Always close wandb run (even if exception occurs)
+            if wandb.run:
+                logger.info('Closing wandb!')
+                wandb.finish()
+            raise
+        finally:
+            # Note: we handle wandb finish inside run_baseline for each baseline
+            pass
+        return metric_dict, object_dict
+
+    return wrap
+
+
+def compute_classification_metrics(
+    y_true: np.ndarray, y_pred: np.ndarray, y_proba: np.ndarray | None = None
+) -> dict[str, float]:
+    """Compute classification metrics.
+
+    :param y_true: True labels
+    :param y_pred: Predicted labels
+    :param y_proba: Predicted probabilities (for ROC-AUC and PR-AUC)
+    :return: Dictionary of metric names and values
+    """
+    metrics = {
+        'accuracy': accuracy_score(y_true, y_pred),
+        'precision': precision_score(y_true, y_pred, average='weighted', zero_division=0),
+        'recall': recall_score(y_true, y_pred, average='weighted', zero_division=0),
+        'f1_weighted': f1_score(y_true, y_pred, average='weighted', zero_division=0),
+        'f1_macro': f1_score(y_true, y_pred, average='macro', zero_division=0),
+        'balanced_accuracy': balanced_accuracy_score(y_true, y_pred),
+    }
+
+    if y_proba is not None:
+        n_classes = len(np.unique(y_true))
+        if n_classes == 2:
+            metrics['auroc'] = roc_auc_score(y_true, y_proba)
+            metrics['pr_auc'] = average_precision_score(y_true, y_proba)
+        elif n_classes > 2 and y_proba.ndim == 2:
+            metrics['auroc'] = roc_auc_score(y_true, y_proba, multi_class='ovr', average='macro')
+            metrics['pr_auc'] = average_precision_score(y_true, y_proba, average='macro')
+
+    return metrics
+
+
+def load_metadata(data_name: str, cfg: DictConfig) -> dict[str, Any] | None:
+    """Load metadata from the pinned HuggingFace revision.
+
+    :param data_name: Name of the dataset
+    :param cfg: Configuration containing revision info
+    :return: Metadata dictionary or None if not found
+    """
+    try:
+        logger.info('Downloading metadata from HuggingFace...')
+        metadata_file = hf_hub_download(  # nosec
+            repo_id=HF_REPO_ID,
+            repo_type='dataset',
+            revision=cfg.dataset.loader.parameters.revision,
+            filename=f'{data_name}_metadata.json',
+        )
+
+        with open(metadata_file) as f:
+            return json.load(f)
+    except Exception as e:
+        logger.warning(f'Could not load metadata: {e}')
+        return None
+
+
+def _resolve_omics_split_settings(cfg: DictConfig) -> tuple[str, int, int]:
+    """Resolve split_type / k / fold from loader params or split_params."""
+    loader = cfg.dataset.loader.parameters
+    split_params = cfg.dataset.get('split_params', {})
+    split_type = loader.get('split_type', split_params.get('split_type', 'fixed'))
+    k = int(loader.get('k', split_params.get('k', 5)))
+    fold = int(loader.get('fold', split_params.get('data_seed', 0)))
+    return str(split_type), k, fold
+
+
+def _resolve_grouping(cfg: DictConfig) -> str | None:
+    loader = cfg.dataset.loader.parameters
+    split_params = cfg.dataset.get('split_params', {})
+    grouping = loader.get('grouping', split_params.get('grouping', None))
+    if grouping in (None, 'null', ''):
+        return None
+    return str(grouping)
+
+
+def _resolve_corrections(cfg: DictConfig) -> list[str]:
+    raw = cfg.dataset.loader.parameters.get('corrections', [])
+    if raw is None:
+        return []
+    return [str(item) for item in list(raw)]
+
+
+def _load_optional_sidecar(cfg: DictConfig, data_name: str, suffix: str) -> pd.DataFrame | None:
+    try:
+        path = hf_hub_download(  # nosec
+            repo_id=HF_REPO_ID,
+            repo_type='dataset',
+            revision=cfg.dataset.loader.parameters.revision,
+            filename=f'{data_name}_{suffix}.parquet',
+        )
+        return pd.read_parquet(path)
+    except Exception:
+        return None
+
+
+def _batch_labels_from_sidecars(
+    cfg: DictConfig, data_name: str, n_samples: int
+) -> np.ndarray | None:
+    batches_df = _load_optional_sidecar(cfg, data_name, 'batches')
+    if batches_df is not None:
+        column = 'batch' if 'batch' in batches_df.columns else batches_df.columns[0]
+        values = batches_df[column].to_numpy()
+        if len(values) != n_samples:
+            raise ValueError('batches sidecar length does not match samples')
+        return values
+    meta = _load_optional_sidecar(cfg, data_name, 'sample_meta')
+    if meta is None or 'batch' not in meta.columns:
+        return None
+    if len(meta) != n_samples:
+        raise ValueError('sample_meta length does not match samples')
+    return meta['batch'].to_numpy()
+
+
+def _get_hf_omics_raw_dir(cfg: DictConfig) -> str:
+    """Construct the path to HFOmicsDataset's raw directory.
+
+    Mirrors the path logic in HFOmicsDataset.__init__ so we can read saved artifacts
+    (selected_data.parquet, targets.npy, split_info.json) without instantiating the full dataset.
+
+    :param cfg: Hydra configuration
+    :return: Path to the raw directory
+    """
+    params = cfg.dataset.loader.parameters
+    split_type, k, fold = _resolve_omics_split_settings(cfg)
+    name = build_omics_cache_relative_name(
+        data_name=params.data_name,
+        adjacency_threshold=params.adjacency_threshold,
+        adjacency_method=params.adjacency_method,
+        method=params.method,
+        node_sample_ratio=params.node_sample_ratio,
+        train_split=params.train_val_test_split[0],
+        split_type=split_type,
+        k=k,
+        fold=fold,
+        corrections=list(params.get('corrections') or []),
+        grouping=_resolve_grouping(cfg),
+        adjacency_target_connectivity=params.get('adjacency_target_connectivity'),
+        revision=params.revision,
+        imputation_method=params.imputation_method,
+        wgcna_binarization=params.wgcna_binarization,
+    )
+    return osp.join(params.data_dir, name, 'raw')
+
+
+def _select_gnn_nodes(
+    train_data: pd.DataFrame,
+    train_targets: np.ndarray,
+    cfg: DictConfig,
+) -> list[str]:
+    """Return the node columns the GNN pipeline would select for this split.
+
+    Mirrors ``HFOmicsDataset.download``: the node budget is derived from the
+    training split size, and the selector sees training samples only. ``method=random``
+    uses the same ``selection_seed`` as the GNN cache.
+    """
+    from omicsgbench.data.selectors import get_selector, selection_seed
+
+    params = cfg.dataset.loader.parameters
+    node_sample_ratio = params.node_sample_ratio
+    n_features = train_data.shape[1]
+    if node_sample_ratio == 'full':
+        n_nodes = n_features
+    else:
+        n_nodes = min(int(len(train_targets) / float(node_sample_ratio)), n_features)
+
+    seed = selection_seed(params.data_name, params.k, params.fold, node_sample_ratio)
+    selector = get_selector(params.method, seed=seed)
+    indices = selector.select(train_data.values, train_targets, n_nodes)
+    return [train_data.columns[i] for i in indices]
+
+
+def _load_split_info(raw_dir: str) -> dict[str, int] | None:
+    """Load split indices saved by HFOmicsDataset.download().
+
+    :param raw_dir: Path to HFOmicsDataset's raw directory
+    :return: Dict with 'train_idx' and 'val_idx', or None if not found
+    """
+    split_info_path = osp.join(raw_dir, 'split_info.json')
+    if not osp.exists(split_info_path):
+        return None
+    with open(split_info_path) as f:
+        return json.load(f)
+
+
+def prepare_param_grid(baseline_config: DictConfig) -> dict[str, list]:
+    """Prepare parameter grid from config.
+
+    :param baseline_config: Baseline configuration containing param_grid
+    :return: Parameter grid for hyperparameter search
+    """
+    if 'param_grid' not in baseline_config:
+        return {}
+
+    # Convert OmegaConf to dict and handle nested _target_ instantiations
+    param_grid = OmegaConf.to_object(baseline_config.param_grid)
+
+    # Handle any _target_ instantiations in param values
+    for key, values in param_grid.items():
+        processed_values = []
+        for val in values:
+            if isinstance(val, dict) and '_target_' in val:
+                # Import the function/class directly
+                target_path = val['_target_']
+                module_path, obj_name = target_path.rsplit('.', 1)
+                module = importlib.import_module(module_path)
+                processed_values.append(getattr(module, obj_name))
+            else:
+                processed_values.append(val)
+        param_grid[key] = processed_values
+
+    return param_grid
+
+
+def _json_safe(value: Any) -> Any:
+    """Convert configuration values to deterministic JSON-compatible values."""
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, np.generic):
+        return value.item()
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    return repr(value)
+
+
+def _param_key(params: dict[str, Any]) -> str:
+    """Return a stable key for one sklearn parameter combination."""
+    return json.dumps(_json_safe(params), sort_keys=True, separators=(',', ':'))
+
+
+def _score_param_grid_on_fold(
+    dataset: DatasetContainer,
+    baseline_config: DictConfig,
+    seed: int,
+    param_grid: dict[str, list],
+) -> dict[str, tuple[dict[str, Any], float]]:
+    """Fit every candidate on one training split and score its validation split."""
+    pipeline = build_pipeline(baseline_config, seed)
+    train_indices = np.arange(len(dataset.y_train))
+    val_indices = np.arange(len(dataset.y_train), len(dataset.y_combined))
+    search = GridSearchCV(
+        pipeline,
+        param_grid=param_grid,
+        cv=[(train_indices, val_indices)],
+        scoring=baseline_config.get('scoring', 'f1_macro'),
+        n_jobs=baseline_config.get('n_jobs', -1),
+        verbose=1,
+        refit=False,
+        error_score='raise',
+    )
+    search.fit(dataset.X_combined, dataset.y_combined)
+
+    results: dict[str, tuple[dict[str, Any], float]] = {}
+    for params, score in zip(
+        search.cv_results_['params'],
+        search.cv_results_['mean_test_score'],
+        strict=True,
+    ):
+        score = float(score)
+        if not np.isfinite(score):
+            raise ValueError(f'Non-finite validation score for parameters {params}: {score}')
+        results[_param_key(params)] = (dict(params), score)
+    return results
+
+
+def _choose_global_hparams(
+    fold_results: dict[int, dict[str, tuple[dict[str, Any], float]]],
+) -> GlobalHparamSelection:
+    """Choose the first grid candidate with the highest mean score across folds."""
+    if not fold_results:
+        raise ValueError('At least one fold result is required')
+
+    ordered_folds = sorted(fold_results)
+    first = fold_results[ordered_folds[0]]
+    if not first:
+        raise ValueError('The parameter grid produced no candidates')
+    expected_keys = list(first)
+    expected_set = set(expected_keys)
+    for fold in ordered_folds[1:]:
+        actual_set = set(fold_results[fold])
+        if actual_set != expected_set:
+            raise ValueError(
+                f'Fold {fold} evaluated a different parameter grid: '
+                f'missing={sorted(expected_set - actual_set)}, '
+                f'extra={sorted(actual_set - expected_set)}'
+            )
+
+    candidate_means = {
+        key: float(np.mean([fold_results[fold][key][1] for fold in ordered_folds]))
+        for key in expected_keys
+    }
+    # GridSearchCV resolves ties by candidate order. Preserve that behavior.
+    best_key = max(expected_keys, key=candidate_means.__getitem__)
+    best_params = first[best_key][0]
+    fold_scores = {fold: fold_results[fold][best_key][1] for fold in ordered_folds}
+    return GlobalHparamSelection(
+        best_params=best_params,
+        mean_score=candidate_means[best_key],
+        fold_scores=fold_scores,
+        candidate_mean_scores=candidate_means,
+    )
+
+
+def _cfg_for_fold(cfg: DictConfig, fold: int) -> DictConfig:
+    """Clone a Hydra config and point both split settings at one fold."""
+    fold_cfg = copy.deepcopy(cfg)
+    OmegaConf.update(fold_cfg, 'dataset.split_params.data_seed', int(fold), force_add=True)
+    OmegaConf.update(fold_cfg, 'dataset.loader.parameters.fold', int(fold), force_add=True)
+    return fold_cfg
+
+
+def _selection_cache_path(
+    cfg: DictConfig,
+    baseline_name: str,
+    baseline_config: DictConfig,
+    preprocessing: str,
+    param_grid: dict[str, list],
+) -> Path:
+    """Build a fold-independent cache path for global hyperparameter selection."""
+    params = cfg.dataset.loader.parameters
+    split_type, k, _ = _resolve_omics_split_settings(cfg)
+    identity = {
+        'protocol_version': 1,
+        'strategy': 'global_kfold_mean_validation',
+        'dataset': str(params.data_name),
+        'baseline': baseline_name,
+        'preprocessing': preprocessing,
+        'split_type': split_type,
+        'k': k,
+        'seed': int(cfg.seed),
+        'node_sample_ratio': _json_safe(params.node_sample_ratio),
+        'method': str(params.method),
+        'scoring': str(baseline_config.get('scoring', 'f1_macro')),
+        'baseline_config': _json_safe(OmegaConf.to_container(baseline_config, resolve=True)),
+        'param_grid': _json_safe(param_grid),
+        'corrections': _resolve_corrections(cfg),
+        'grouping': _resolve_grouping(cfg),
+        'revision': str(params.get('revision', '')),
+    }
+    digest = hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(',', ':')).encode()
+    ).hexdigest()[:20]
+    cache_dir = Path(str(cfg.baseline_hparam_cache_dir))
+    safe_ratio = str(params.node_sample_ratio).replace('/', '_')
+    return cache_dir / (
+        f'{params.data_name}_{baseline_name}_r{safe_ratio}_m{params.method}_{digest}.json'
+    )
+
+
+def _load_selection_cache(path: Path) -> GlobalHparamSelection | None:
+    if not path.exists():
+        return None
+    with path.open() as handle:
+        raw = json.load(handle)
+    return GlobalHparamSelection(
+        best_params=dict(raw['best_params']),
+        mean_score=float(raw['mean_score']),
+        fold_scores={int(key): float(value) for key, value in raw['fold_scores'].items()},
+        candidate_mean_scores={
+            str(key): float(value) for key, value in raw['candidate_mean_scores'].items()
+        },
+        cache_path=path,
+    )
+
+
+def _write_selection_cache(path: Path, selection: GlobalHparamSelection) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + f'.tmp-{os.getpid()}')
+    payload = {
+        'best_params': _json_safe(selection.best_params),
+        'mean_score': selection.mean_score,
+        'fold_scores': selection.fold_scores,
+        'candidate_mean_scores': selection.candidate_mean_scores,
+    }
+    with temporary.open('w') as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+    os.replace(temporary, path)
+
+
+def _select_global_kfold_hparams(
+    cfg: DictConfig,
+    baseline_name: str,
+    baseline_config: DictConfig,
+    preprocessing: str,
+    param_grid: dict[str, list],
+    current_dataset: DatasetContainer,
+    fold_datasets: dict[tuple[str, int], DatasetContainer] | None = None,
+) -> GlobalHparamSelection:
+    """Select one candidate by mean validation score over all configured folds.
+
+    A process lock makes the cache safe when multiple Hydra fold jobs for the
+    same outer cell start concurrently. ``fold_datasets`` is reused across the
+    baselines in one job so each fold's features, which include the expensive
+    distance-correlation scan, are built at most once.
+    """
+    split_type, k, current_fold = _resolve_omics_split_settings(cfg)
+    if split_type != 'k-fold':
+        raise ValueError('Global k-fold hyperparameter selection requires split_type=k-fold')
+
+    cache_path = _selection_cache_path(
+        cfg, baseline_name, baseline_config, preprocessing, param_grid
+    )
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = cache_path.with_suffix(cache_path.suffix + '.lock')
+    with lock_path.open('w') as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        cached = _load_selection_cache(cache_path)
+        if cached is not None:
+            logger.info('Reusing global hyperparameter selection from %s', cache_path)
+            return cached
+
+        logger.info(
+            'Selecting one %s hyperparameter configuration by mean validation score '
+            'across folds 0..%s',
+            baseline_name,
+            k - 1,
+        )
+        if fold_datasets is None:
+            fold_datasets = {}
+        fold_datasets.setdefault((preprocessing, current_fold), current_dataset)
+
+        fold_results: dict[int, dict[str, tuple[dict[str, Any], float]]] = {}
+        for fold in range(k):
+            fold_dataset = fold_datasets.get((preprocessing, fold))
+            if fold_dataset is None:
+                fold_cfg = _cfg_for_fold(cfg, fold)
+                fold_dataset = (
+                    load_and_prepare_data_gnn_features(fold_cfg)
+                    if preprocessing == 'gnn_features'
+                    else load_and_prepare_data(fold_cfg)
+                )
+                fold_datasets[(preprocessing, fold)] = fold_dataset
+            logger.info(
+                'Scoring %s grid on fold %s/%s (train=%s, val=%s)',
+                baseline_name,
+                fold,
+                k,
+                len(fold_dataset.y_train),
+                len(fold_dataset.y_val),
+            )
+            fold_results[fold] = _score_param_grid_on_fold(
+                fold_dataset, baseline_config, int(cfg.seed), param_grid
+            )
+
+        selected = _choose_global_hparams(fold_results)
+        selected = GlobalHparamSelection(
+            best_params=selected.best_params,
+            mean_score=selected.mean_score,
+            fold_scores=selected.fold_scores,
+            candidate_mean_scores=selected.candidate_mean_scores,
+            cache_path=cache_path,
+        )
+        _write_selection_cache(cache_path, selected)
+        logger.info('Global best parameters: %s', selected.best_params)
+        logger.info(
+            'Global mean validation score: %.4f; fold scores: %s',
+            selected.mean_score,
+            selected.fold_scores,
+        )
+        return selected
+
+
+def _resolve_baseline_hparam_selection(cfg: DictConfig, split_type: str) -> str:
+    """K-fold runs select one configuration by mean validation score across folds."""
+    if split_type != 'k-fold':
+        return 'single_train_validation_split'
+    requested = cfg.get('baseline_hparam_selection')
+    if requested not in (None, 'global_kfold_mean_validation'):
+        raise ValueError(
+            'k-fold baselines require baseline_hparam_selection=global_kfold_mean_validation, '
+            f'got {requested!r}'
+        )
+    return 'global_kfold_mean_validation'
+
+
+def load_and_prepare_data(cfg: DictConfig) -> DatasetContainer:
+    """Load and prepare data for baseline evaluation.
+
+    :param cfg: Configuration composed by Hydra
+    :return: DatasetContainer with all data variants
+    """
+    data_name = cfg.dataset.loader.parameters.data_name
+
+    # Load metadata to get class names
+    metadata = load_metadata(data_name, cfg)
+    class_names = None
+    if metadata and 'statistics' in metadata and 'target_stats' in metadata['statistics']:
+        target_stats = metadata['statistics']['target_stats']
+        if 'class_names' in target_stats:
+            class_names = target_stats['class_names']
+            logger.info(f'Found class names: {class_names}')
+
+    # Always the pinned Hub revision, like HFOmicsDataset: local processor output in
+    # temp_data/ may predate the train-only correction refactor.
+    revision = cfg.dataset.loader.parameters.revision
+    logger.info('Downloading %s from HuggingFace revision %s...', data_name, revision)
+    data_file = hf_hub_download(  # nosec
+        repo_id=HF_REPO_ID,
+        repo_type='dataset',
+        revision=revision,
+        filename=f'{data_name}_data.parquet',
+    )
+    targets_file = hf_hub_download(  # nosec
+        repo_id=HF_REPO_ID,
+        repo_type='dataset',
+        revision=revision,
+        filename=f'{data_name}_targets.parquet',
+    )
+
+    # Load data
+    data = pd.read_parquet(data_file)
+    targets_df = pd.read_parquet(targets_file)
+
+    if 'target' in data.columns:
+        data = data.drop('target', axis=1)
+
+    targets = targets_df['target'].values
+
+    logger.info(f'Loaded {len(targets)} samples with {data.shape[1]} features')
+
+    split_type, k, fold = _resolve_omics_split_settings(cfg)
+    grouping = _resolve_grouping(cfg)
+    batches = (
+        _batch_labels_from_sidecars(cfg, data_name, len(targets)) if grouping == 'batch' else None
+    )
+    groups = resolve_split_groups(grouping, batches, targets, split_type=split_type, k=k)
+
+    train_val_test_split = list(
+        OmegaConf.to_container(cfg.dataset.loader.parameters.train_val_test_split, resolve=True)
+    )
+    split_arrays = compute_omics_split_indices(
+        targets,
+        split_type=split_type,
+        k=k,
+        fold=fold,
+        train_val_test_split=train_val_test_split,
+        random_state=42,
+        groups=groups,
+    )
+    logger.info(
+        f'Using shared omics split ({split_type}'
+        + (f', fold={fold}/{k}' if split_type == 'k-fold' else '')
+        + (f', grouping={grouping}' if grouping else '')
+        + ')'
+    )
+
+    train_data = data.iloc[split_arrays['train']].reset_index(drop=True)
+    val_data = data.iloc[split_arrays['valid']].reset_index(drop=True)
+    test_data = data.iloc[split_arrays['test']].reset_index(drop=True)
+    y_train = targets[split_arrays['train']]
+    y_val = targets[split_arrays['valid']]
+    y_test = targets[split_arrays['test']]
+
+    for name in _resolve_corrections(cfg):
+        if name == 'median_center':
+            continue
+        if name == 'covariate_adjust':
+            cov = _load_optional_sidecar(cfg, data_name, 'covariates')
+            if cov is None:
+                raise FileNotFoundError(f'{data_name}_covariates.parquet is required')
+            adjuster = CovariateAdjuster()
+            adjuster.fit(train_data, cov.iloc[split_arrays['train']].reset_index(drop=True))
+            train_data = adjuster.transform(
+                train_data, cov.iloc[split_arrays['train']].reset_index(drop=True)
+            )
+            val_data = adjuster.transform(
+                val_data, cov.iloc[split_arrays['valid']].reset_index(drop=True)
+            )
+            test_data = adjuster.transform(
+                test_data, cov.iloc[split_arrays['test']].reset_index(drop=True)
+            )
+        elif name == 'combat':
+            batches = _batch_labels_from_sidecars(cfg, data_name, len(targets))
+            if batches is None:
+                raise FileNotFoundError(f'batch labels are required for combat on {data_name}')
+            corrector = CombatCorrector()
+            corrector.fit(train_data, batches[split_arrays['train']])
+            train_data = corrector.transform(train_data, batches[split_arrays['train']])
+            val_data = corrector.transform(val_data, batches[split_arrays['valid']])
+            test_data = corrector.transform(test_data, batches[split_arrays['test']])
+        elif name == 'promoter_min_beta':
+            probe_map = _load_optional_sidecar(cfg, data_name, 'probe_map')
+            if probe_map is None:
+                raise FileNotFoundError(f'{data_name}_probe_map.parquet is required')
+            selector = PromoterMinBetaSelector()
+            selector.fit(train_data, y_train, probe_map)
+            train_data = selector.transform(train_data)
+            val_data = selector.transform(val_data)
+            test_data = selector.transform(test_data)
+        else:
+            raise ValueError(f'Unknown correction {name!r}')
+
+    X_train = train_data.values
+    X_val = val_data.values
+    X_test = test_data.values
+
+    logger.info(f'Train set: {X_train.shape}, Val set: {X_val.shape}, Test set: {X_test.shape}')
+    unique_train, counts_train = np.unique(y_train, return_counts=True)
+    unique_val, counts_val = np.unique(y_val, return_counts=True)
+    unique_test, counts_test = np.unique(y_test, return_counts=True)
+    logger.info(
+        f'Class distribution - Train: {dict(zip(unique_train, counts_train, strict=True))}, '
+        f'Val: {dict(zip(unique_val, counts_val, strict=True))}, '
+        f'Test: {dict(zip(unique_test, counts_test, strict=True))}'
+    )
+
+    # Keep raw data for plotting
+    X_train_raw = X_train.copy()
+    X_val_raw = X_val.copy()
+    X_test_raw = X_test.copy()
+
+    # Impute missing values (using mean strategy like in HFOmicsDataset)
+    imputer = SimpleImputer(strategy=cfg.dataset.loader.parameters.imputation_method)
+    train_data = pd.DataFrame(
+        imputer.fit_transform(train_data), columns=train_data.columns, index=train_data.index
+    )
+    val_data = pd.DataFrame(
+        imputer.transform(val_data), columns=val_data.columns, index=val_data.index
+    )
+    test_data = pd.DataFrame(
+        imputer.transform(test_data), columns=test_data.columns, index=test_data.index
+    )
+    if 'median_center' in _resolve_corrections(cfg):
+        centerer = MedianCenterer()
+        centerer.fit(train_data)
+        train_data = centerer.transform(train_data)
+        val_data = centerer.transform(val_data)
+        test_data = centerer.transform(test_data)
+
+    selected_nodes = _select_gnn_nodes(train_data, y_train, cfg)
+    column_positions = [train_data.columns.get_loc(col) for col in selected_nodes]
+    train_data = train_data.loc[:, selected_nodes]
+    val_data = val_data.loc[:, selected_nodes]
+    test_data = test_data.loc[:, selected_nodes]
+    X_train_raw = X_train_raw[:, column_positions]
+    X_val_raw = X_val_raw[:, column_positions]
+    X_test_raw = X_test_raw[:, column_positions]
+    logger.info(
+        'Selected %s nodes with method=%s, node_sample_ratio=%s',
+        len(selected_nodes),
+        cfg.dataset.loader.parameters.method,
+        cfg.dataset.loader.parameters.node_sample_ratio,
+    )
+
+    X_train_imputed = train_data.values
+    X_val_imputed = val_data.values
+    X_test_imputed = test_data.values
+
+    # Combine train and val for GridSearchCV with custom split (use imputed but unscaled)
+    X_combined = np.vstack([X_train_imputed, X_val_imputed])
+    y_combined = np.concatenate([y_train, y_val])
+
+    # Get class distribution info
+    unique_train, counts_train = np.unique(y_train, return_counts=True)
+    unique_val, counts_val = np.unique(y_val, return_counts=True)
+    unique_test, counts_test = np.unique(y_test, return_counts=True)
+    class_distribution = {
+        'train': dict(zip(unique_train, counts_train, strict=True)),
+        'val': dict(zip(unique_val, counts_val, strict=True)),
+        'test': dict(zip(unique_test, counts_test, strict=True)),
+    }
+
+    return DatasetContainer(
+        X_train_raw=X_train_raw,
+        X_val_raw=X_val_raw,
+        X_test_raw=X_test_raw,
+        y_train=y_train,
+        y_val=y_val,
+        y_test=y_test,
+        X_train_processed=X_train_imputed,  # Now contains imputed but unscaled data
+        X_val_processed=X_val_imputed,  # Now contains imputed but unscaled data
+        X_test_processed=X_test_imputed,  # Now contains imputed but unscaled data
+        X_combined=X_combined,
+        y_combined=y_combined,
+        dataset_name=data_name,
+        n_features=X_train_imputed.shape[1],
+        n_samples=len(targets),
+        class_distribution=class_distribution,
+        class_names=class_names,
+    )
+
+
+def load_and_prepare_data_gnn_features(cfg: DictConfig) -> DatasetContainer:
+    """Load and prepare data using the same feature preprocessing as GNNs.
+
+    Uses the artifacts saved by HFOmicsDataset.download() (selected_data.parquet, targets.npy,
+    split_info.json) to guarantee identical preprocessing and splits as the GNN pipeline. The saved
+    data is already ordered as train|val|test, imputed, and feature-selected (fold-aware when
+    ``split_type=k-fold``).
+
+    :param cfg: Configuration composed by Hydra
+    :return: DatasetContainer with GNN-preprocessed features
+    """
+    data_name = cfg.dataset.loader.parameters.data_name
+
+    metadata = load_metadata(data_name, cfg)
+    class_names = None
+    if metadata and 'statistics' in metadata and 'target_stats' in metadata['statistics']:
+        target_stats = metadata['statistics']['target_stats']
+        if 'class_names' in target_stats:
+            class_names = target_stats['class_names']
+            logger.info(f'Found class names: {class_names}')
+
+    raw_dir = _get_hf_omics_raw_dir(cfg)
+    selected_data_path = osp.join(raw_dir, 'selected_data.parquet')
+    targets_path = osp.join(raw_dir, 'targets.npy')
+
+    if not osp.exists(selected_data_path) or not osp.exists(targets_path):
+        raise FileNotFoundError(
+            f'GNN dataset artifacts not found at {raw_dir}. '
+            'Run the GNN pipeline first to generate selected_data.parquet and targets.npy.'
+        )
+
+    split_info = _load_split_info(raw_dir)
+    if split_info is None:
+        raise FileNotFoundError(
+            f'split_info.json not found at {raw_dir}. '
+            'Run the GNN pipeline first to generate split artifacts.'
+        )
+
+    data = pd.read_parquet(selected_data_path)
+    targets = np.load(targets_path)
+    train_idx = split_info['train_idx']
+    val_idx = split_info['val_idx']
+
+    logger.info(
+        f'[GNN features] Loaded {len(targets)} samples with {data.shape[1]} features '
+        f'from HFOmicsDataset artifacts at {raw_dir}'
+    )
+
+    X_train = data.iloc[:train_idx].values
+    y_train = targets[:train_idx]
+    X_val = data.iloc[train_idx:val_idx].values
+    y_val = targets[train_idx:val_idx]
+    X_test = data.iloc[val_idx:].values
+    y_test = targets[val_idx:]
+
+    logger.info(
+        f'[GNN features] Split: Train={len(y_train)}, Val={len(y_val)}, Test={len(y_test)}'
+    )
+
+    X_combined = np.vstack([X_train, X_val])
+    y_combined = np.concatenate([y_train, y_val])
+
+    unique_train, counts_train = np.unique(y_train, return_counts=True)
+    unique_val, counts_val = np.unique(y_val, return_counts=True)
+    unique_test, counts_test = np.unique(y_test, return_counts=True)
+    class_distribution = {
+        'train': dict(zip(unique_train, counts_train, strict=True)),
+        'val': dict(zip(unique_val, counts_val, strict=True)),
+        'test': dict(zip(unique_test, counts_test, strict=True)),
+    }
+
+    n_features = data.shape[1]
+
+    return DatasetContainer(
+        X_train_raw=X_train,
+        X_val_raw=X_val,
+        X_test_raw=X_test,
+        y_train=y_train,
+        y_val=y_val,
+        y_test=y_test,
+        X_train_processed=X_train,
+        X_val_processed=X_val,
+        X_test_processed=X_test,
+        X_combined=X_combined,
+        y_combined=y_combined,
+        dataset_name=data_name,
+        n_features=n_features,
+        n_samples=len(targets),
+        class_distribution=class_distribution,
+        class_names=class_names,
+    )
+
+
+def evaluate_and_log_metrics(
+    pipeline: Pipeline,
+    X_val: np.ndarray,
+    y_val: np.ndarray,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    best_params: dict[str, Any],
+    best_score: float | None,
+) -> tuple[dict[str, float], dict[str, float]]:
+    """Evaluate pipeline and log metrics to wandb.
+
+    :param pipeline: Trained sklearn pipeline
+    :param X_val: Validation features
+    :param y_val: Validation targets
+    :param X_test: Test features
+    :param y_test: Test targets
+    :param best_params: Best hyperparameters from grid search
+    :param best_score: Best CV score from grid search
+    :return: Tuple of (validation metrics, test metrics) dictionaries
+    """
+    # Evaluate on validation set
+    logger.info('Evaluating on validation set...')
+    y_val_pred = pipeline.predict(X_val)
+
+    # Get probabilities if available for validation
+    y_val_proba = None
+    if hasattr(pipeline, 'predict_proba'):
+        y_val_proba_full = pipeline.predict_proba(X_val)
+        if y_val_proba_full.shape[1] == 2:  # Binary classification
+            y_val_proba = y_val_proba_full[:, 1]
+        else:  # Multi-class: pass full probability matrix
+            y_val_proba = y_val_proba_full
+    elif hasattr(pipeline, 'decision_function'):
+        y_val_proba = pipeline.decision_function(X_val)
+
+    # Compute validation metrics
+    val_metrics = compute_classification_metrics(y_val, y_val_pred, y_val_proba)
+
+    logger.info('Validation Metrics:')
+    for metric_name, metric_value in val_metrics.items():
+        logger.info(f'  {metric_name}: {metric_value:.4f}')
+
+    # Evaluate on test set
+    logger.info('Evaluating on test set...')
+    y_test_pred = pipeline.predict(X_test)
+
+    # Get probabilities if available for test
+    y_test_proba = None
+    if hasattr(pipeline, 'predict_proba'):
+        y_test_proba_full = pipeline.predict_proba(X_test)
+        if y_test_proba_full.shape[1] == 2:  # Binary classification
+            y_test_proba = y_test_proba_full[:, 1]
+        else:  # Multi-class: pass full probability matrix
+            y_test_proba = y_test_proba_full
+    elif hasattr(pipeline, 'decision_function'):
+        y_test_proba = pipeline.decision_function(X_test)
+
+    # Compute test metrics
+    test_metrics = compute_classification_metrics(y_test, y_test_pred, y_test_proba)
+
+    logger.info('Test Metrics:')
+    for metric_name, metric_value in test_metrics.items():
+        logger.info(f'  {metric_name}: {metric_value:.4f}')
+
+    # Log to wandb
+    wandb_metrics = {f'val/{k}': v for k, v in val_metrics.items()}
+    wandb_metrics.update({f'test/{k}': v for k, v in test_metrics.items()})
+
+    if best_score is not None:
+        wandb_metrics['train/best_cv_score'] = best_score
+
+    if best_params:
+        # Log hyperparameters
+        for param_name, param_value in best_params.items():
+            wandb_metrics[f'hyperparams/{param_name}'] = str(param_value)
+
+    wandb.log(wandb_metrics)
+
+    return val_metrics, test_metrics
+
+
+def build_pipeline(baseline_config: DictConfig, seed: int) -> Pipeline:
+    """Build sklearn pipeline from config.
+
+    :param baseline_config: Baseline configuration containing pipeline steps
+    :param seed: Random seed for reproducibility
+    :return: Constructed sklearn pipeline
+    """
+    steps = []
+
+    for step_config in baseline_config.pipeline:
+        step_name = step_config.name
+
+        # Create a copy without the 'name' field, resolving interpolations
+        step_config_copy = OmegaConf.to_container(step_config, resolve=True)
+        step_config_copy.pop('name', None)
+
+        # Replace ${seed} with actual seed value if present
+        def replace_seed(obj):
+            if isinstance(obj, dict):
+                return {k: replace_seed(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [replace_seed(item) for item in obj]
+            elif obj == '${seed}':
+                return seed
+            else:
+                return obj
+
+        step_config_copy = replace_seed(step_config_copy)
+
+        # Handle nested _target_ (like score_func in SelectKBest)
+        if 'score_func' in step_config_copy and isinstance(step_config_copy['score_func'], dict):
+            if '_target_' in step_config_copy['score_func']:
+                # Import the function directly
+                func_path = step_config_copy['score_func']['_target_']
+                module_path, func_name = func_path.rsplit('.', 1)
+                module = importlib.import_module(module_path)
+                step_config_copy['score_func'] = getattr(module, func_name)
+
+        # Handle estimator (nested pipeline like in CalibratedClassifierCV)
+        if 'estimator' in step_config_copy and isinstance(step_config_copy['estimator'], dict):
+            if '_target_' in step_config_copy['estimator']:
+                step_config_copy['estimator'] = hydra.utils.instantiate(
+                    step_config_copy['estimator']
+                )
+
+        # Instantiate the step
+        step_obj = hydra.utils.instantiate(step_config_copy, _convert_='partial')
+        steps.append((step_name, step_obj))
+
+    return Pipeline(steps)
+
+
+def generate_comprehensive_plots(
+    pipeline: Pipeline,
+    dataset: DatasetContainer,
+    baseline_name: str,
+    output_dir: Path,
+    val_metrics: dict[str, float] | None = None,
+) -> None:
+    """Generate comprehensive evaluation plots in a single figure.
+
+    :param pipeline: Trained sklearn pipeline
+    :param dataset: DatasetContainer with all data variants
+    :param baseline_name: Name of the baseline model
+    :param output_dir: Directory to save plots
+    :param val_metrics: Validation metrics dictionary to include in title
+    """
+    logger.info(f'Generating comprehensive plots for best baseline: {baseline_name}')
+
+    # Create output directory
+    plot_dir = output_dir / 'plots'
+    plot_dir.mkdir(parents=True, exist_ok=True)
+
+    # Get imputed but unscaled features (let pipeline handle all transformations)
+    X_train_imputed, X_val_imputed, _ = dataset.get_features_at_stage('processed')
+
+    # Apply pipeline up to feature selection to get selected features
+    if 'feature_selection' in [step[0] for step in pipeline.steps]:
+        X_train_before_selection = X_train_imputed.copy()
+        X_train_after_selection = X_train_imputed.copy()
+        X_val_after_selection = X_val_imputed.copy()
+
+        for _, step in pipeline.steps[:-1]:  # Exclude classifier
+            X_train_after_selection = step.transform(X_train_after_selection)
+            X_val_after_selection = step.transform(X_val_after_selection)
+    else:
+        X_train_before_selection = X_train_imputed
+        X_train_after_selection = X_train_imputed
+        X_val_after_selection = X_val_imputed
+
+    # Generate predictions (pipeline will handle all preprocessing internally)
+    y_train_pred = pipeline.predict(X_train_imputed)
+    y_val_pred = pipeline.predict(X_val_imputed)
+
+    # Get probabilities if available
+    y_train_proba = None
+    y_val_proba = None
+    if hasattr(pipeline, 'predict_proba'):
+        y_train_proba_full = pipeline.predict_proba(X_train_imputed)
+        y_val_proba_full = pipeline.predict_proba(X_val_imputed)
+        if y_train_proba_full.shape[1] == 2:  # Binary classification
+            y_train_proba = y_train_proba_full[:, 1]
+            y_val_proba = y_val_proba_full[:, 1]
+    elif hasattr(pipeline, 'decision_function'):
+        y_train_proba = pipeline.decision_function(X_train_imputed)
+        y_val_proba = pipeline.decision_function(X_val_imputed)
+
+    # Create comprehensive figure
+    fig = plt.figure(figsize=(20, 24))
+
+    # Define grid layout: 4 rows, 3 columns
+    gs = fig.add_gridspec(4, 3, hspace=0.3, wspace=0.3)
+
+    # 1. Class Balance (top row, spans 2 columns)
+    ax1 = fig.add_subplot(gs[0, :2])
+    class_info = dataset.get_class_info()
+    unique_train = list(class_info['train'].keys())
+    counts_train = list(class_info['train'].values())
+    counts_val = list(class_info['val'].values())
+
+    x_pos = np.arange(len(unique_train))
+    width = 0.35
+
+    ax1.bar(x_pos - width / 2, counts_train, width, label='Train', alpha=0.7, edgecolor='black')
+    ax1.bar(x_pos + width / 2, counts_val, width, label='Val', alpha=0.7, edgecolor='black')
+    ax1.set_xlabel('Class')
+    ax1.set_ylabel('Count')
+    ax1.set_title('Class Distribution')
+    ax1.set_xticks(x_pos)
+
+    # Use class names if available, otherwise use numeric labels
+    if dataset.class_names is not None and len(dataset.class_names) == len(unique_train):
+        # Map numeric labels to class names
+        label_mapping = {i: dataset.class_names[i] for i in unique_train}
+        labels = [label_mapping[i] for i in unique_train]
+    else:
+        labels = unique_train
+
+    ax1.set_xticklabels(labels)
+    ax1.legend()
+    ax1.grid(True, alpha=0.3, axis='y')
+
+    # Add count labels
+    for i, (train_count, val_count) in enumerate(zip(counts_train, counts_val, strict=True)):
+        ax1.text(i - width / 2, train_count, str(train_count), ha='center', va='bottom')
+        ax1.text(i + width / 2, val_count, str(val_count), ha='center', va='bottom')
+
+    # 2. Raw Features Distribution (top row, right column)
+    ax2 = fig.add_subplot(gs[0, 2])
+    X_train_raw, X_val_raw, _ = dataset.get_features_at_stage('raw')
+    n_features_to_plot = min(100, X_train_raw.shape[1])
+    feature_indices = np.random.RandomState(42).choice(
+        X_train_raw.shape[1], n_features_to_plot, replace=False
+    )
+
+    data_to_plot = X_train_raw[:, feature_indices].flatten()
+    data_to_plot = data_to_plot[~np.isnan(data_to_plot)]
+
+    # Create histogram with better visualization
+    counts, bins, patches = ax2.hist(
+        data_to_plot, bins=50, alpha=0.7, edgecolor='black', color='skyblue'
+    )
+    ax2.set_xlabel('Feature Value')
+    ax2.set_ylabel('Count')
+    ax2.set_title(
+        f'Raw Features Distribution\n({n_features_to_plot} sampled from {X_train_raw.shape[1]:,} features)'
+    )
+    ax2.grid(True, alpha=0.3, axis='y')
+
+    # Add statistics text
+    mean_val = np.mean(data_to_plot)
+    std_val = np.std(data_to_plot)
+    ax2.text(
+        0.02,
+        0.98,
+        f'Mean: {mean_val:.2f}\nStd: {std_val:.2f}',
+        transform=ax2.transAxes,
+        verticalalignment='top',
+        bbox={'boxstyle': 'round', 'facecolor': 'white', 'alpha': 0.8},
+    )
+
+    # 3. Feature Variance Before Selection (second row, left)
+    ax3 = fig.add_subplot(gs[1, 0])
+    feature_vars = np.var(X_train_before_selection, axis=0)
+    sorted_vars = np.sort(feature_vars)[::-1][:500]  # Show top 500 for better visualization
+
+    ax3.plot(sorted_vars, marker='.', linestyle='-', alpha=0.7, color='darkgreen', markersize=2)
+    ax3.set_xlabel('Feature Rank (by variance)')
+    ax3.set_ylabel('Variance')
+    ax3.set_title(f'Feature Variance Ranking\n(Top 500 of {len(feature_vars):,} features)')
+    ax3.grid(True, alpha=0.3)
+    ax3.set_yscale('log')
+
+    # Add percentile markers
+    p50_idx = int(0.5 * len(sorted_vars))
+    p90_idx = int(0.9 * len(sorted_vars))
+    ax3.axvline(p50_idx, color='red', linestyle='--', alpha=0.7, label='50th percentile')
+    ax3.axvline(p90_idx, color='orange', linestyle='--', alpha=0.7, label='90th percentile')
+    ax3.legend(fontsize=8)
+
+    # 4. Selected Features Distribution (second row, middle)
+    ax4 = fig.add_subplot(gs[1, 1])
+    n_sel_to_plot = min(100, X_train_after_selection.shape[1])
+    sel_indices = np.random.RandomState(42).choice(
+        X_train_after_selection.shape[1], n_sel_to_plot, replace=False
+    )
+    data_to_plot = X_train_after_selection[:, sel_indices].flatten()
+
+    # Create histogram with better visualization
+    counts, bins, patches = ax4.hist(
+        data_to_plot, bins=50, alpha=0.7, edgecolor='black', color='orange'
+    )
+    ax4.set_xlabel('Feature Value')
+    ax4.set_ylabel('Count')
+    ax4.set_title(
+        f'Selected Features Distribution\n({n_sel_to_plot} sampled from {X_train_after_selection.shape[1]} selected)'
+    )
+    ax4.grid(True, alpha=0.3, axis='y')
+
+    # Add statistics text
+    mean_val = np.mean(data_to_plot)
+    std_val = np.std(data_to_plot)
+    ax4.text(
+        0.02,
+        0.98,
+        f'Mean: {mean_val:.2f}\nStd: {std_val:.2f}',
+        transform=ax4.transAxes,
+        verticalalignment='top',
+        bbox={'boxstyle': 'round', 'facecolor': 'white', 'alpha': 0.8},
+    )
+
+    # 5. PCA Visualization Train (second row, right)
+    ax5 = fig.add_subplot(gs[1, 2])
+    pca = PCA(n_components=2, random_state=42)
+    X_pca = pca.fit_transform(X_train_after_selection)
+    scatter = ax5.scatter(
+        X_pca[:, 0],
+        X_pca[:, 1],
+        c=dataset.y_train,
+        cmap='viridis',
+        alpha=0.6,
+        edgecolors='k',
+        linewidth=0.5,
+    )
+    ax5.set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.2%} var)')
+    ax5.set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.2%} var)')
+    ax5.set_title(f'PCA - Train Set\n({X_train_after_selection.shape[1]} features)')
+    ax5.grid(True, alpha=0.3)
+
+    # Use class names for colorbar if available
+    colorbar_label = 'Class'
+    if dataset.class_names is not None:
+        colorbar_label = f'Class ({", ".join(dataset.class_names)})'
+
+    plt.colorbar(scatter, ax=ax5, label=colorbar_label)
+
+    # 6. PCA Visualization Val (third row, left)
+    ax6 = fig.add_subplot(gs[2, 0])
+    X_pca_val = pca.transform(X_val_after_selection)
+    scatter = ax6.scatter(
+        X_pca_val[:, 0],
+        X_pca_val[:, 1],
+        c=dataset.y_val,
+        cmap='viridis',
+        alpha=0.6,
+        edgecolors='k',
+        linewidth=0.5,
+    )
+    ax6.set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.2%} var)')
+    ax6.set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.2%} var)')
+    ax6.set_title(f'PCA - Val Set\n({X_val_after_selection.shape[1]} features)')
+    ax6.grid(True, alpha=0.3)
+    plt.colorbar(scatter, ax=ax6, label=colorbar_label)
+
+    # 7. Confusion Matrix Train (third row, middle)
+    ax7 = fig.add_subplot(gs[2, 1])
+
+    # Use class names for confusion matrix if available
+    display_labels = None
+    if dataset.class_names is not None:
+        display_labels = dataset.class_names
+
+    ConfusionMatrixDisplay.from_predictions(
+        dataset.y_train,
+        y_train_pred,
+        ax=ax7,
+        cmap='Blues',
+        values_format='d',
+        display_labels=display_labels,
+    )
+    ax7.set_title('Confusion Matrix - Train')
+
+    # 8. Confusion Matrix Val (third row, right)
+    ax8 = fig.add_subplot(gs[2, 2])
+    ConfusionMatrixDisplay.from_predictions(
+        dataset.y_val,
+        y_val_pred,
+        ax=ax8,
+        cmap='Blues',
+        values_format='d',
+        display_labels=display_labels,
+    )
+    ax8.set_title('Confusion Matrix - Val')
+
+    # Add threshold info for binary classification
+    if y_val_proba is not None and dataset.get_class_info()['is_binary']:
+        ax8.text(
+            0.02,
+            0.98,
+            'Threshold: 0.5',
+            transform=ax8.transAxes,
+            verticalalignment='top',
+            bbox={'boxstyle': 'round', 'facecolor': 'lightblue', 'alpha': 0.8},
+            fontsize=10,
+        )
+
+    # 9. ROC Curves (bottom row, left and middle) - only for binary classification
+    if y_train_proba is not None and dataset.get_class_info()['is_binary']:
+        ax9 = fig.add_subplot(gs[3, 0])
+        RocCurveDisplay.from_predictions(dataset.y_train, y_train_proba, ax=ax9, name='Train')
+        ax9.plot([0, 1], [0, 1], 'k--', label='Random')
+        ax9.axvline(0.5, color='red', linestyle=':', alpha=0.7, label='Threshold: 0.5')
+        ax9.set_title('ROC Curve - Train')
+        ax9.legend()
+        ax9.grid(True, alpha=0.3)
+
+        ax10 = fig.add_subplot(gs[3, 1])
+        RocCurveDisplay.from_predictions(dataset.y_val, y_val_proba, ax=ax10, name='Val')
+        ax10.plot([0, 1], [0, 1], 'k--', label='Random')
+        ax10.axvline(0.5, color='red', linestyle=':', alpha=0.7, label='Threshold: 0.5')
+        ax10.set_title('ROC Curve - Val')
+        ax10.legend()
+        ax10.grid(True, alpha=0.3)
+
+        # 10. Precision-Recall Curves (bottom row, right)
+        ax11 = fig.add_subplot(gs[3, 2])
+        PrecisionRecallDisplay.from_predictions(dataset.y_val, y_val_proba, ax=ax11, name='Val')
+        ax11.axhline(0.5, color='red', linestyle=':', alpha=0.7, label='Threshold: 0.5')
+        ax11.set_title('Precision-Recall Curve - Val')
+        ax11.legend()
+        ax11.grid(True, alpha=0.3)
+    else:
+        # If not binary classification, show additional feature analysis
+        ax9 = fig.add_subplot(gs[3, :])
+        class_info = dataset.get_class_info()
+        ax9.text(
+            0.5,
+            0.5,
+            f'Multiclass Classification\n({class_info["n_classes"]} classes)\nROC/PR curves not shown',
+            ha='center',
+            va='center',
+            transform=ax9.transAxes,
+            fontsize=14,
+        )
+        ax9.set_title('Classification Type')
+        ax9.axis('off')
+
+    # Add overall title with dataset name and F1 macro score (much bigger)
+    f1_macro_text = ''
+    if val_metrics and 'f1_macro' in val_metrics:
+        f1_macro_text = f' (F1 Macro: {val_metrics["f1_macro"]:.3f})'
+
+    fig.suptitle(
+        f'{dataset.dataset_name.upper()} Dataset - Comprehensive Evaluation Report - {baseline_name}{f1_macro_text}',
+        fontsize=24,
+        y=0.98,
+        fontweight='bold',
+    )
+
+    # Save the comprehensive plot
+    output_path = plot_dir / f'{dataset.dataset_name}_{baseline_name}_comprehensive_report.png'
+    fig.savefig(output_path, bbox_inches='tight', dpi=300)
+    logger.info(f'Saved comprehensive report to {output_path}')
+
+    # Log to wandb
+    if wandb.run is not None:
+        wandb.log({'plots/comprehensive_report': wandb.Image(fig)})
+
+    plt.close(fig)
+
+
+@task_wrapper
+def run_baseline(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Run sklearn baseline classification.
+
+    :param cfg: Configuration composed by Hydra
+    :return: Tuple with metrics and object dict
+    """
+    logger.info('Starting Sklearn Baseline Runner')
+    logger.info('Loading dataset: %s', cfg.dataset.loader.parameters.data_name)
+
+    if 'baselines' not in cfg.dataset:
+        raise ValueError('No baselines defined in dataset config')
+
+    baseline_filter = cfg.get('baseline_filter', None)
+
+    baselines_to_run = {
+        name: bl_cfg
+        for name, bl_cfg in cfg.dataset.baselines.items()
+        if baseline_filter is None or bl_cfg.get('preprocessing', 'standard') == baseline_filter
+    }
+
+    if not baselines_to_run:
+        logger.info('No baselines match filter=%s, skipping.', baseline_filter)
+        return {}, {'cfg': cfg, 'all_results': {}, 'best_baseline': None}
+
+    dataset_standard: DatasetContainer | None = None
+    dataset_gnn: DatasetContainer | None = None
+
+    needs_standard = any(
+        bl_cfg.get('preprocessing', 'standard') == 'standard'
+        for bl_cfg in baselines_to_run.values()
+    )
+    needs_gnn = any(
+        bl_cfg.get('preprocessing', 'standard') == 'gnn_features'
+        for bl_cfg in baselines_to_run.values()
+    )
+
+    if needs_standard:
+        dataset_standard = load_and_prepare_data(cfg)
+    if needs_gnn:
+        logger.info('GNN-features preprocessing requested, loading GNN-preprocessed data...')
+        dataset_gnn = load_and_prepare_data_gnn_features(cfg)
+
+    all_results = {}
+    # Shared across baselines so the per-fold feature build, including the
+    # expensive distance-correlation scan, runs at most once per fold per job.
+    fold_datasets: dict[tuple[str, int], DatasetContainer] = {}
+
+    for baseline_name, baseline_config in baselines_to_run.items():
+        preprocessing = baseline_config.get('preprocessing', 'standard')
+        if preprocessing == 'gnn_features':
+            if dataset_gnn is None:
+                raise RuntimeError('GNN dataset not loaded but gnn_features baseline requested')
+            dataset = dataset_gnn
+            logger.info('Running baseline: %s (GNN-features preprocessing)', baseline_name)
+        else:
+            if dataset_standard is None:
+                raise RuntimeError('Standard dataset not loaded but standard baseline requested')
+            dataset = dataset_standard
+            logger.info('Running baseline: %s', baseline_name)
+
+        params = cfg.dataset.loader.parameters
+        data_name = params.data_name
+        split_type, k, fold = _resolve_omics_split_settings(cfg)
+        effective_hparam_selection = _resolve_baseline_hparam_selection(cfg, split_type)
+        use_global_kfold_selection = effective_hparam_selection == 'global_kfold_mean_validation'
+
+        nsr = params.node_sample_ratio
+        method = params.method
+        run_name = f'baseline_{baseline_name}_{data_name}_r{nsr}_m{method}'
+        if split_type == 'k-fold':
+            selection_label = 'global-hp_' if use_global_kfold_selection else ''
+            run_name = f'{run_name}_{selection_label}k-fold_fold{fold}'
+
+        wandb_config = {
+            'baseline_name': baseline_name,
+            'dataset': data_name,
+            'seed': cfg.seed,
+            'train_val_test_split': list(params.train_val_test_split),
+            'task': cfg.dataset.parameters.task,
+            'monitor_metric': cfg.dataset.parameters.get('monitor_metric', 'f1_weighted'),
+            'preprocessing': preprocessing,
+            'n_features': dataset.n_features,
+            'split_type': split_type,
+            'k': k,
+            'fold': fold,
+            'dataset.split_params.data_seed': fold,
+            'dataset.split_params.split_type': split_type,
+            'dataset.split_params.k': k,
+            'hparam_selection': effective_hparam_selection,
+        }
+
+        wandb_config['node_sample_ratio'] = params.node_sample_ratio
+        wandb_config['method'] = params.method
+
+        wandb.init(
+            project=cfg.logger.wandb.project,
+            entity=cfg.logger.wandb.get('entity'),
+            name=run_name,
+            config=wandb_config,
+            tags=cfg.get('tags', []) + ['baseline', baseline_name],
+            group=cfg.logger.wandb.get('group', ''),
+            save_code=True,
+        )
+
+        # Build pipeline
+        logger.info('Building pipeline...')
+        pipeline = build_pipeline(baseline_config, cfg.seed)
+        logger.info(f'Pipeline: {pipeline}')
+
+        # Prepare parameter grid
+        param_grid = prepare_param_grid(baseline_config)
+
+        if param_grid:
+            logger.info(f'Parameter grid: {param_grid}')
+            selection: GlobalHparamSelection | None = None
+            if use_global_kfold_selection:
+                selection = _select_global_kfold_hparams(
+                    cfg,
+                    baseline_name,
+                    baseline_config,
+                    preprocessing,
+                    param_grid,
+                    dataset,
+                    fold_datasets=fold_datasets,
+                )
+                best_params = selection.best_params
+                best_score = selection.mean_score
+                wandb.log(
+                    {
+                        'selection/mean_validation_score': selection.mean_score,
+                        **{
+                            f'selection/fold_{selection_fold}_validation_score': score
+                            for selection_fold, score in selection.fold_scores.items()
+                        },
+                    }
+                )
+                wandb.config.update(
+                    {
+                        'selected_hyperparameters': _json_safe(selection.best_params),
+                        'selection_fold_scores': selection.fold_scores,
+                        'selection_mean_validation_score': selection.mean_score,
+                    },
+                    allow_val_change=True,
+                )
+            else:
+                # Fixed splits have one train/validation cut, so the grid is scored there.
+                train_indices = np.arange(len(dataset.y_train))
+                val_indices = np.arange(len(dataset.y_train), len(dataset.y_combined))
+                logger.info(
+                    'Using one train/validation split: train=%s, val=%s',
+                    len(train_indices),
+                    len(val_indices),
+                )
+                search = GridSearchCV(
+                    pipeline,
+                    param_grid=param_grid,
+                    cv=[(train_indices, val_indices)],
+                    scoring=baseline_config.get('scoring', 'f1_macro'),
+                    n_jobs=baseline_config.get('n_jobs', -1),
+                    verbose=1,
+                    refit=False,
+                    error_score='raise',
+                )
+                logger.info('Training with the single train/validation split...')
+                search.fit(dataset.X_combined, dataset.y_combined)
+                best_params = dict(search.best_params_)
+                best_score = float(search.best_score_)
+                logger.info('Best parameters: %s', best_params)
+                logger.info('Best validation score: %.4f', best_score)
+
+            # Manually refit the best pipeline on training data only
+            logger.info('Refitting best pipeline on training data only...')
+            best_pipeline = build_pipeline(baseline_config, cfg.seed)
+
+            # Set the best parameters
+            for param_name, param_value in best_params.items():
+                best_pipeline.set_params(**{param_name: param_value})
+
+            # Fit only on training data (imputed but unscaled)
+            best_pipeline.fit(dataset.X_train_processed, dataset.y_train)
+        else:
+            logger.info('No parameter grid provided, training with default parameters...')
+            pipeline.fit(dataset.X_train_processed, dataset.y_train)  # imputed but unscaled
+            best_pipeline = pipeline
+            best_params = {}
+            best_score = None
+
+        # Evaluate and log metrics
+        val_metrics, test_metrics = evaluate_and_log_metrics(
+            best_pipeline,
+            dataset.X_val_processed,
+            dataset.y_val,
+            dataset.X_test_processed,
+            dataset.y_test,
+            best_params,
+            best_score,
+        )
+
+        # Store results
+        all_results[baseline_name] = {
+            'val_metrics': val_metrics,
+            'test_metrics': test_metrics,
+            'best_params': best_params,
+            'best_cv_score': best_score,
+            'preprocessing': preprocessing,
+        }
+
+        # Finish wandb run for this baseline
+        wandb.finish()
+
+        logger.info(f'Completed baseline: {baseline_name}')
+
+    # Create summary
+    logger.info('BASELINE RESULTS SUMMARY')
+
+    monitor_metric = cfg.dataset.parameters.get('monitor_metric', 'f1_weighted')
+
+    # Sort baselines by monitor metric (using validation for model selection)
+    sorted_baselines = sorted(
+        all_results.items(),
+        key=lambda x: x[1]['val_metrics'].get(monitor_metric, 0),
+        reverse=True,
+    )
+
+    logger.info(f'Ranking by val {monitor_metric}:')
+    for rank, (name, results) in enumerate(sorted_baselines, 1):
+        val_metric = results['val_metrics'].get(monitor_metric, 0)
+        test_metric = results['test_metrics'].get(monitor_metric, 0)
+        logger.info(f'{rank}. {name:30s} val: {val_metric:.4f}, test: {test_metric:.4f}')
+
+    # Return best baseline results
+    best_baseline_name, best_results = sorted_baselines[0]
+    logger.info(f'Best baseline: {best_baseline_name}')
+
+    # Generate comprehensive plots for the best baseline
+    logger.info('Generating comprehensive plots for the best baseline...')
+
+    # Select the correct dataset for the best baseline's preprocessing
+    best_preprocessing = best_results.get('preprocessing', 'standard')
+    best_dataset = dataset_gnn if best_preprocessing == 'gnn_features' else dataset_standard
+
+    # Rebuild the best pipeline with the best hyperparameters
+    best_baseline_config = cfg.dataset.baselines[best_baseline_name]
+    best_pipeline = build_pipeline(best_baseline_config, cfg.seed)
+
+    # Set hyperparameters if they were searched
+    if best_results['best_params']:
+        best_pipeline.set_params(**best_results['best_params'])
+
+    # Retrain on train set only (not combined) for proper evaluation (imputed but unscaled)
+    best_pipeline.fit(best_dataset.X_train_processed, best_dataset.y_train)
+
+    # Generate comprehensive plots
+    output_dir = Path(cfg.get('output_dir', 'outputs'))
+    generate_comprehensive_plots(
+        pipeline=best_pipeline,
+        dataset=best_dataset,
+        baseline_name=best_baseline_name,
+        output_dir=output_dir,
+        val_metrics=best_results['val_metrics'],
+    )
+
+    metric_dict = {f'val/{k}': v for k, v in best_results['val_metrics'].items()}
+    metric_dict.update({f'test/{k}': v for k, v in best_results['test_metrics'].items()})
+    object_dict = {
+        'cfg': cfg,
+        'all_results': all_results,
+        'best_baseline': best_baseline_name,
+    }
+
+    return metric_dict, object_dict
+
+
+@hydra.main(version_base='1.3', config_path='../configs', config_name='baseline.yaml')
+def main(cfg: DictConfig) -> float | None:
+    """Main entry point for baseline runner.
+
+    :param cfg: Configuration composed by Hydra
+    :return: Optimized metric value
+    """
+    # Run baselines
+    metric_dict, _ = run_baseline(cfg)
+
+    # Return monitor metric for optimization
+    monitor_metric = cfg.dataset.parameters.get('monitor_metric', 'f1_weighted')
+    return metric_dict.get(f'val/{monitor_metric}')
+
+
+if __name__ == '__main__':
+    main()

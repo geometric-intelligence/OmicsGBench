@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from omegaconf import OmegaConf
 
-from ogbench.data.loaders.graph.omics_datasets import OmicsDatasetLoader
+from omicsgbench.data.loaders.graph.omics_datasets import OmicsDatasetLoader
 
 
 class _FakeDataset(SimpleNamespace):

@@ -2,7 +2,7 @@
 
 import torch
 
-from ogbench.optimizer import TBOptimizer
+from omicsgbench.optimizer import TBOptimizer
 
 
 class TestTBOptimizer:

@@ -20,8 +20,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.utils import shuffle
 from tqdm import tqdm
 
-from ogbench.data.adjacency import get_adjacency_builder
-from ogbench.data.selectors import get_selector
+from omicsgbench.data.adjacency import get_adjacency_builder
+from omicsgbench.data.selectors import get_selector
 
 # Set style
 sns.set_style('whitegrid')

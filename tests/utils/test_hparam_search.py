@@ -13,7 +13,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from ogbench.utils.hparam_search import (
+from omicsgbench.utils.hparam_search import (
     DEADLINE_ENV_VAR,
     OBJECTIVE_PAYLOAD_PREFIX,
     THREAD_ENV_VARS,
@@ -43,7 +43,7 @@ def test_single_thread_environment_overrides_existing_values() -> None:
     env = single_thread_environment({'OMP_NUM_THREADS': '12', 'OTHER': 'kept'})
 
     assert env['OTHER'] == 'kept'
-    assert env['OGBENCH_NUM_THREADS'] == '1'
+    assert env['OMICSGBENCH_NUM_THREADS'] == '1'
     assert all(env[name] == '1' for name in THREAD_ENV_VARS)
 
 
@@ -72,7 +72,7 @@ def test_run_training_enforces_thread_and_dataloader_limits(
     assert error is None
     assert metrics is not None and metrics['objective'] == 0.5
     command = run.call_args.args[0]
-    assert command[:3] == [sys.executable, '-m', 'ogbench.run']
+    assert command[:3] == [sys.executable, '-m', 'omicsgbench.run']
     assert 'dataset.dataloader_params.num_workers=0' in command
     assert 'dataset.dataloader_params.persistent_workers=false' in command
     env = run.call_args.kwargs['env']
@@ -124,7 +124,7 @@ def test_configure_torch_threads_uses_launcher_limit(
 ) -> None:
     set_threads = Mock()
     set_interop_threads = Mock()
-    monkeypatch.setenv('OGBENCH_NUM_THREADS', '1')
+    monkeypatch.setenv('OMICSGBENCH_NUM_THREADS', '1')
     monkeypatch.setattr('torch.set_num_threads', set_threads)
     monkeypatch.setattr('torch.set_num_interop_threads', set_interop_threads)
 

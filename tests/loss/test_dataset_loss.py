@@ -4,7 +4,7 @@ import pytest
 import torch
 import torch_geometric
 
-from ogbench.loss.dataset import DatasetLoss
+from omicsgbench.loss.dataset import DatasetLoss
 
 
 class TestDatasetLoss:

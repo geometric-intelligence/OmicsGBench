@@ -4,9 +4,9 @@
 import hydra
 import torch
 
-from ogbench.data.preprocessor import PreProcessor
-from ogbench.dataloader import TBDataloader
-from ogbench.dataloader.utils import to_data_list
+from omicsgbench.data.preprocessor import PreProcessor
+from omicsgbench.dataloader import TBDataloader
+from omicsgbench.dataloader.utils import to_data_list
 
 # rootutils.setup_root("./", indicator=".project-root", pythonpath=True)
 

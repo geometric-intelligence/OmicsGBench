@@ -4,8 +4,8 @@ import pytest
 import torch
 import torch_geometric.data as tg_data
 
-from ogbench.nn.readouts.base import AbstractZeroCellReadOut
-from ogbench.nn.readouts.identical import NoReadOut
+from omicsgbench.nn.readouts.base import AbstractZeroCellReadOut
+from omicsgbench.nn.readouts.identical import NoReadOut
 
 
 class TestNoReadOut:

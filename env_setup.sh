@@ -26,13 +26,18 @@ if ! command -v conda &> /dev/null; then
     echo "Conda installation complete"
 fi
 
-if ! conda env list | grep -q "ogbench"; then
-    conda create -n ogbench python=3.12 -y
+eval "$(conda shell.bash hook)"
+
+if ! conda env list | grep -qw "omicsgbench"; then
+    conda create -n omicsgbench python=3.12 -y
 fi
 
-conda activate ogbench
+conda activate omicsgbench
 
+# pip ignores [tool.uv] in pyproject.toml, so pass the PyG wheel index explicitly.
 pip install --upgrade pip
-pip install -e '.[all]'
+pip install -e '.[all]' -f "${PYG_WHEELS:-https://data.pyg.org/whl/torch-2.8.0+cu128.html}"
 
 pre-commit install
+
+echo "Done. Run 'conda activate omicsgbench' to use the environment."

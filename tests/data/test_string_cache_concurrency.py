@@ -12,8 +12,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from ogbench.data.adjacency import string as string_module
-from ogbench.data.adjacency.string import STRINGAdjacencyBuilder
+from omicsgbench.data.adjacency import string as string_module
+from omicsgbench.data.adjacency.string import STRINGAdjacencyBuilder
 
 
 def _increment_under_lock(lock_path: str, counter_path: str, repeats: int) -> None:

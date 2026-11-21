@@ -223,7 +223,7 @@ def process_smoking(output_dir: str = 'temp_data') -> None:
         preprocessing_notes=(
             'GSE50660 Illumina 450k beta values restricted to HumanMethylation450 v1.2 '
             'probes annotated as TSS1500 or TSS200. Hub matrices are uncorrected promoter '
-            'probes. ogbench picks, for each gene, the candidate probe with the minimum mean '
+            'probes. omicsgbench picks, for each gene, the candidate probe with the minimum mean '
             'beta on training never-smokers (label 0), imputes remaining NaNs with training '
             'column means, and median-centers each gene on the training split only. The '
             'original 3-class GEO smoking status (0=never, 1=former, 2=current) is collapsed '

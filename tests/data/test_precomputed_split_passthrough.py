@@ -9,7 +9,7 @@ import torch
 from omegaconf import OmegaConf
 from torch_geometric.data import Data, InMemoryDataset
 
-from ogbench.data.preprocessor import PreProcessor
+from omicsgbench.data.preprocessor import PreProcessor
 
 N_TRAIN, N_VAL, N_TEST = 30, 10, 10
 

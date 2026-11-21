@@ -4,7 +4,7 @@ import torch
 from omegaconf import OmegaConf
 from torch_geometric.data import Data
 
-from ogbench.utils.config_resolvers import (
+from omicsgbench.utils.config_resolvers import (
     calculate_num_nodes,
     sync_num_nodes_from_dataset,
 )

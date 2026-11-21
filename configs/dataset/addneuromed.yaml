@@ -1,5 +1,5 @@
 loader:
-  _target_: ogbench.data.loaders.graph.omics_datasets.OmicsDatasetLoader
+  _target_: omicsgbench.data.loaders.graph.omics_datasets.OmicsDatasetLoader
   parameters:
     data_type: omics
     data_domain: graph

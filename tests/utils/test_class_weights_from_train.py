@@ -7,8 +7,8 @@ from omegaconf import OmegaConf
 from sklearn.utils.class_weight import compute_class_weight
 from torch_geometric.data import Data
 
-from ogbench.dataloader import DataloadDataset
-from ogbench.utils.config_resolvers import resolve_class_weights_from_dataset
+from omicsgbench.dataloader import DataloadDataset
+from omicsgbench.utils.config_resolvers import resolve_class_weights_from_dataset
 
 
 def _cfg(class_weights, num_classes=3):

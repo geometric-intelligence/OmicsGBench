@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from omegaconf import OmegaConf
 
-import ogbench.baseline as baseline
+import omicsgbench.baseline as baseline
 
 
 def _candidate(params, score):

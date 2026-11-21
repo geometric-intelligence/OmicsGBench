@@ -6,7 +6,7 @@ import pytest
 import torch
 import torch_geometric
 
-from ogbench.loss.model.DGMLoss import DGMLoss
+from omicsgbench.loss.model.DGMLoss import DGMLoss
 
 
 @pytest.fixture

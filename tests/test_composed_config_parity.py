@@ -11,8 +11,8 @@ import pytest
 from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
 
-from ogbench.baseline import _get_hf_omics_raw_dir
-from ogbench.utils.config_resolvers import register_all_resolvers
+from omicsgbench.baseline import _get_hf_omics_raw_dir
+from omicsgbench.utils.config_resolvers import register_all_resolvers
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = ROOT / 'configs'
